@@ -1,0 +1,3 @@
+!*.nit
+!*.nit.args
+.nit_compile/*
