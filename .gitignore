@@ -1,3 +1,5 @@
 !*.nit
 !*.nit.args
 .nit_compile/*
+.DS_Store
+*~
