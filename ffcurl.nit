@@ -14,7 +14,7 @@ in "C header" `{
 
 // CUSTOM TYPES
 
-	// File infos structure.
+	/* // File infos structure.
 	typedef struct scFileInfos {
 		FILE *file;
 		char *filename;
@@ -26,7 +26,7 @@ in "C header" `{
 		CURL *curl;
 		void *infos;
 	} NitCURL;
-
+	*/
 
 
 `}
@@ -99,21 +99,18 @@ in "C body" `{
 
 
 
+
 	// Callback method of file downloading
 	// 
-	static size_t scfile_callback_datawrite( void *buffer, size_t size, size_t nmenb, void *stream )
+	static size_t callback_write_todisk( void *buffer, size_t size, size_t nmenb, void *stream)
 	{
-		ScFileInfos *fileInfos;
-		fileInfos = (ScFileInfos*)stream;
+		FILE *tgFile;
+		tgFile = (FILE*)stream;
 		
-		if(fileInfos && !fileInfos->file)
-		{
-			fileInfos->file = fopen(fileInfos->filename, "wb");
-			if(!fileInfos->file)
-				return -1;
-		}
+		if(!tgFile)
+			return -1;
 
-		return fwrite( buffer, size, nmenb, fileInfos->file);
+		return fwrite( buffer, size, nmenb, tgFile);
 	}
 
 
@@ -121,56 +118,86 @@ in "C body" `{
 
 
 
+extern FFFile `{ FILE* `}
+
+	new `{
+		return self=NULL;
+	`}
 
 
+	fun open(str: CString): FFFile `{
+
+		self = fopen(str, "wb");
+		if(!self)
+			return NULL;
+
+		return self;
+	`}
 
 
-extern FFCurl `{ NitCURL * `}
+	fun close `{
+		if(self != NULL)
+			fclose(self);
+	`}
+
+end
+
+
+extern FFCurl `{ CURL * `}
 
 
 	################################
 	new easy_init `{
 
-		NitCURL *self;
-		self = malloc(sizeof(NitCURL*));
-		self->curl = curl_easy_init();
-
+		CURL *self;
+		self = curl_easy_init();
 		return self;
 	`}
 	
 	#################################
 	fun easy_clean `{
-		curl_easy_cleanup( recv->curl );
+		curl_easy_cleanup( recv );
 		//free(recv);
 	`}
 
 
-	################################
-	fun easy_setopt(url : String) import String::to_cstring `{
-		
-		char *tUrl = NULL;
-		tUrl = String_to_cstring(url);
-		
-		ScFileInfos * fileInfos = (ScFileInfos*)fileName(tUrl);
 
 
-		// Setting target url
-		curl_easy_setopt( recv->curl, CURLOPT_URL, fileInfos->url );
 
-		// Setting ON redirection
-		curl_easy_setopt( recv->curl, CURLOPT_FOLLOWLOCATION, 1L );
+	fun setopt(opt: CURLOption, obj: Object)
+	do
+		if obj.isa(Int)
+		then
+			i_setopt_int(opt, obj.as(Int))
+		else if obj.isa(String)
+		then
+			i_setopt_string(opt, obj.as(String))
+		else if obj.isa(FFFile)
+		then
+			i_setopt_file(opt, obj.as(FFFile))
+		else
+			abort
+		end
+	end
 
-		// Setting callback method
-		curl_easy_setopt( recv->curl, CURLOPT_WRITEFUNCTION, scfile_callback_datawrite);
-		
-		// Giving pointer of file infos struct to get callback
-		curl_easy_setopt( recv->curl, CURLOPT_WRITEDATA, fileInfos );
 
-		// Preventing from empty path
-		//curl_easy_setopt( recv->curl, CURLOPT_NOBODY, 1L);
+	fun i_setopt_int(opt: CURLOption, num: Int) `{	
+		curl_easy_setopt( recv, opt, num);
+	`}
 
-	
-		recv->infos = fileInfos;
+	fun i_setopt_string(opt: CURLOption, str: String) import String::to_cstring `{
+		char *rStr = NULL;
+		rStr = String_to_cstring(str);
+		curl_easy_setopt( recv, opt, rStr);
+	`}
+
+	fun i_setopt_file(opt: CURLOption,fl: FFFile) `{
+		curl_easy_setopt( recv, opt, (FILE*)fl);
+	`}
+
+
+	fun f_setopt_writetodisk_callback `{
+		curl_easy_setopt( recv, CURLOPT_WRITEFUNCTION, callback_write_todisk);
 	`}
 
 
@@ -180,7 +207,7 @@ extern FFCurl `{ NitCURL * `}
 	fun easy_perform : Int
 	`{		
 		CURLcode res;
-		res = curl_easy_perform( recv->curl );
+		res = curl_easy_perform( recv );
 		
 		/* Error checking */
 		if(res != CURLE_OK)
@@ -190,23 +217,10 @@ extern FFCurl `{ NitCURL * `}
 		}
 		else
 			return res;
-
-
-		ScFileInfos *fileInfos = recv->infos;
-		if(fileInfos->file != NULL)
-			fclose(fileInfos->file);
-
 	`}
 
 
 
-
-	# ! Others methods
-	# - Debugger
-	# CURLOPT can be replaced by CURLOPT_DEBUGFUNCTION 
-	# and pointer to function to choose which infos we 
-	#  want to log.
-	fun debugger= (v:Bool) `{ curl_easy_setopt(recv->curl, CURLOPT_VERBOSE, v); `}
 
 end
 
