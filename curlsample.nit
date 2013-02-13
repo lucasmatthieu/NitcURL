@@ -1,8 +1,11 @@
 module curlsample
 import curl
 
-
-
-var curlObj = new Curl
-curlObj.get("http://papercom.fr/apache.zip")
+if args.is_empty then
+	abort
+else
+	print "P:"+args[0]
+	var curlObj = new Curl
+	curlObj.get(args[0])
+end
 
