@@ -16,34 +16,85 @@ in "C body" `{
 		if(!tgFile) return -1;
 		return fwrite( buffer, size, nmenb, tgFile);
 	}
-`}	
+
+
+	struct fffile { FILE *file; char *filename; };
+`}
+
+
+extern CURLMailRecipients `{ struct curl_slist* `}
+	new `{ 
+		struct curl_slist *recipients = NULL;
+		return recipients;
+	`}
+	fun is_init:Bool `{ return recv != NULL;`}
+	#redef fun to_s
+end
+
 
 extern CURLCode `{ CURLcode `}
+	fun code:Int `{ return recv; `}
 	fun is_ok:Bool `{ return recv == CURLE_OK; `}
 	fun is_valid_protocol:Bool `{  return recv == CURLE_UNSUPPORTED_PROTOCOL; `}
 	fun is_valid_init:Bool `{ return recv == CURLE_FAILED_INIT; `}
-
-	redef fun to_s import String::from_cstring `{ 
-		int c = (int)recv;
-		char *s;
-		s=malloc(sizeof(char));
-		sprintf(s, "%d", c);
-		// @TODO NEED BE FREEING
-		return new_String_from_cstring(s); 
-	`}
+	redef fun to_s do return code.to_s end
 end
 
-extern FFFile `{ FILE* `}
-	new open(str: NativeString) `{ return fopen(str, "wb"); `}
 
-	fun is_valid:Bool `{ return (recv != NULL); `}
-	fun close:Int `{ 
-		// 0 for success
-		if(recv != NULL) return fclose(recv);
+extern FFFile `{ struct fffile* `}
+	new open(str: NativeString) `{
+		struct fffile *recv;
+		recv = malloc(sizeof(struct fffile));
+		(*recv).filename = malloc(strlen(str)*sizeof(char));
+		strcpy((*recv).filename, str);
+		(*recv).file = fopen(str, "wb");
+		return recv;
+	`}
+
+	fun is_valid:Bool `{ return ((*recv).file != NULL); `}
+	
+	# 0 for success
+	fun close:Int `{
+		if((*recv).file != NULL) return fclose((*recv).file);
 		else return 1;
 	`}
+	fun remove:Int `{ 
+		if((*recv).filename != NULL) return remove((*recv).filename);
+		else return 1; 
+	`}
+	fun release `{ 
+		(*recv).file=NULL; 
+		free((*recv).filename); 
+		(*recv).filename=NULL; 
+		free(recv);
+		recv=NULL;
+	`}
 
+	fun clean:Bool
+	do
+		if remove != 0 then return false
+		release
+		return true
+	end
+
+	fun finish:Bool
+	do
+		if close != 0 then return false
+		release
+		return true
+	end
+
+	fun clear:Bool 
+	do
+		if close != 0 then return false
+		if remove != 0 then return false
+		release
+		return true
+	end
 end
+
+
+
 
 extern FFCurl `{ CURL * `}
 
@@ -61,6 +112,10 @@ extern FFCurl `{ CURL * `}
 			return i_setopt_string(opt, obj)
 		else if obj isa FFFile then
 			return i_setopt_file(opt, obj)
+		else if obj isa Array[String] then
+			var mail_recpts= new CURLMailRecipients
+			mail_recpts=i_add_recipients(mail_recpts, obj[0])
+			return i_setopt_recipients(opt, mail_recpts)
 		else
 			abort
 		end
@@ -73,9 +128,31 @@ extern FFCurl `{ CURL * `}
 		char *rStr = String_to_cstring(str);
 		return curl_easy_setopt( recv, opt, rStr);
 	`}
-	fun i_setopt_file(opt: CURLOption,fl: FFFile):CURLCode `{ 
-		return curl_easy_setopt( recv, opt, (FILE*)fl); 
+	fun i_setopt_file(opt: CURLOption, fl: FFFile):CURLCode `{ 
+		return curl_easy_setopt( recv, opt, (FILE*)(*fl).file); 
 	`}
+
+	#
+	#
+	#
+
+	# @DOING MAIL ------
+	fun i_add_recipients(recpt:CURLMailRecipients, str:String):CURLMailRecipients import String::to_cstring `{
+		char *rStr = String_to_cstring(str);
+		return curl_slist_append(recpt, rStr);
+	`}
+
+	fun i_setopt_recipients(opt:CURLOption, rcp:CURLMailRecipients):CURLCode `{
+		return curl_easy_setopt( recv, opt, rcp);
+	`}
+	# @MAKE MORE GENERIC
+	fun clean_list(rcpt:CURLMailRecipients) `{
+		return curl_slist_free_all(rcpt);
+	`}
+
+	#
+	#
+	#
 
 	# @TOKNOW COMPORTEMENT PAR DEFAUT
 	fun f_setopt_writetodisk_callback:CURLCode `{
@@ -242,8 +319,8 @@ extern CURLOption `{ CURLoption `}
 #	new  `{ return CURLOPT_ISSUERCERT; `}
 #	new  `{ return CURLOPT_ADDRESS_SCOPE; `}
 #	new  `{ return CURLOPT_CERTINFO; `}
-#	new  `{ return CURLOPT_USERNAME; `}
-#	new  `{ return CURLOPT_PASSWORD; `}
+	new  username `{ return CURLOPT_USERNAME; `}
+	new  password `{ return CURLOPT_PASSWORD; `}
 #	new  `{ return CURLOPT_PROXYUSERNAME; `}
 #	new  `{ return CURLOPT_PROXYPASSWORD; `}
 #	new  `{ return CURLOPT_NOPROXY; `}
@@ -255,8 +332,8 @@ extern CURLOption `{ CURLoption `}
 #	new  `{ return CURLOPT_SSH_KNOWNHOSTS; `}
 #	new  `{ return CURLOPT_SSH_KEYFUNCTION; `}
 #	new  `{ return CURLOPT_SSH_KEYDATA; `}
-#	new  `{ return CURLOPT_MAIL_FROM; `}
-#	new  `{ return CURLOPT_MAIL_RCPT; `}
+	new  mail_from `{ return CURLOPT_MAIL_FROM; `}
+	new  mail_rcpt `{ return CURLOPT_MAIL_RCPT; `}
 #	new  `{ return CURLOPT_FTP_USE_PRET; `}
 #	new  `{ return CURLOPT_RTSP_REQUEST; `}
 #	new  `{ return CURLOPT_RTSP_SESSION_ID; `}

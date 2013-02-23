@@ -1,4 +1,4 @@
-module curlsample
+module get_curlsample
 import curl
 
 if args.is_empty then
@@ -6,6 +6,8 @@ if args.is_empty then
 else
 	print "P:"+args[0]
 	var curlObj = new Curl
-	curlObj.get(args[0])
+	var resp = curlObj.get(args[0])
+	if resp != null then print resp
+	
 end
 
