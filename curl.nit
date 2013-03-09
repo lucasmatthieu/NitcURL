@@ -32,7 +32,7 @@ class Curl
 		status_code=null
 		body_str=null
 		verbose=false
-		headers=false
+		headers=null
 	end
 
 	# CONSTANTES
