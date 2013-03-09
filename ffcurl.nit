@@ -31,8 +31,9 @@ extern CURLMailRecipients `{ struct curl_slist* `}
 	#redef fun to_s
 end
 
-
 extern CURLCode `{ CURLcode `}
+
+	new unknown_option `{ return CURLE_UNKNOWN_OPTION; `}
 	fun code:Int `{ return recv; `}
 	fun is_ok:Bool `{ return recv == CURLE_OK; `}
 	fun is_valid_protocol:Bool `{  return recv == CURLE_UNSUPPORTED_PROTOCOL; `}
@@ -40,12 +41,11 @@ extern CURLCode `{ CURLcode `}
 	redef fun to_s do return code.to_s end
 end
 
-
 extern FFFile `{ struct fffile* `}
 	new open(str: NativeString) `{
 		struct fffile *recv;
 		recv = malloc(sizeof(struct fffile));
-		(*recv).filename = malloc(strlen(str)*sizeof(char));
+		(*recv).filename = malloc((1+strlen(str))*sizeof(char));
 		strcpy((*recv).filename, str);
 		(*recv).file = fopen(str, "wb");
 		return recv;
@@ -56,11 +56,11 @@ extern FFFile `{ struct fffile* `}
 	# 0 for success
 	fun close:Int `{
 		if((*recv).file != NULL) return fclose((*recv).file);
-		else return 1;
+		return 1;
 	`}
 	fun remove:Int `{ 
 		if((*recv).filename != NULL) return remove((*recv).filename);
-		else return 1; 
+		return 1; 
 	`}
 	fun release `{ 
 		(*recv).file=NULL; 
@@ -76,14 +76,12 @@ extern FFFile `{ struct fffile* `}
 		release
 		return true
 	end
-
 	fun finish:Bool
 	do
 		if close != 0 then return false
 		release
 		return true
 	end
-
 	fun clear:Bool 
 	do
 		if close != 0 then return false
@@ -94,20 +92,21 @@ extern FFFile `{ struct fffile* `}
 end
 
 
-
-
 extern FFCurl `{ CURL * `}
 
+	# Lifetime
 	new easy_init `{ return curl_easy_init();`}
 	fun is_init:Bool `{ return (recv != NULL); `}
-
 	fun easy_clean `{ curl_easy_cleanup( recv ); `}
 	fun easy_perform:CURLCode `{ return curl_easy_perform( recv ); `}
 
+	# Set options
 	fun setopt(opt: CURLOption, obj: Object):CURLCode
 	do
 		if obj isa Int then
 			return i_setopt_int(opt, obj)
+		else if obj isa Bool then
+			return i_setopt_int(opt, obj.to_s.to_i)
 		else if obj isa String then 
 			return i_setopt_string(opt, obj)
 		else if obj isa FFFile then
@@ -116,11 +115,10 @@ extern FFCurl `{ CURL * `}
 			var mail_recpts= new CURLMailRecipients
 			mail_recpts=i_add_recipients(mail_recpts, obj[0])
 			return i_setopt_recipients(opt, mail_recpts)
-		else
-			abort
 		end
-	end
 
+		return new CURLCode.unknown_option
+	end
 	fun i_setopt_int(opt: CURLOption, num: Int):CURLCode `{ 
 		return curl_easy_setopt( recv, opt, num); 
 	`}
@@ -132,10 +130,29 @@ extern FFCurl `{ CURL * `}
 		return curl_easy_setopt( recv, opt, (FILE*)(*fl).file); 
 	`}
 
-	#
-	#
-	#
+	# Get infos
+	fun i_getinfo_long(opt: CURLInfo, ans: CURLInfoResponse_long):CURLCode `{
+		return curl_easy_getinfo( recv, opt, ans);
+	`}
+	fun easy_getinfo(opt: CURLInfo):nullable CURLInfoResponse
+	do
+		if opt == new CURLInfo.response_code then
+			var resp = new CURLInfoResponse_long
+			var curlcode = i_getinfo_long(opt, resp)
+			if not curlcode.is_ok then return null
+			return resp
+		end
 
+		return null
+	end
+
+
+
+
+
+
+	#
+	#
 	# @DOING MAIL ------
 	fun i_add_recipients(recpt:CURLMailRecipients, str:String):CURLMailRecipients import String::to_cstring `{
 		char *rStr = String_to_cstring(str);
@@ -149,8 +166,6 @@ extern FFCurl `{ CURL * `}
 	fun clean_list(rcpt:CURLMailRecipients) `{
 		return curl_slist_free_all(rcpt);
 	`}
-
-	#
 	#
 	#
 
@@ -159,6 +174,25 @@ extern FFCurl `{ CURL * `}
 		return curl_easy_setopt( recv, CURLOPT_WRITEFUNCTION, callback_write_todisk);
 	`}
 
+end
+
+
+extern CURLInfo `{ CURLINFO `}
+	new response_code `{ return CURLINFO_RESPONSE_CODE; `}
+end
+
+
+# Never released
+extern CURLInfoResponse `{ void* `}
+	fun response:nullable Object do return null end
+	redef fun to_s do return response.to_s end
+	fun release `{ if(recv != NULL) free(recv); recv=NULL; `}
+end
+extern CURLInfoResponse_long `{ long* `}
+	super CURLInfoResponse
+	new `{ return (long*)malloc(sizeof(long));`}
+	redef fun response:Int `{ return *recv; `}
+	fun to_i:Int do return to_s.to_i end
 end
 
 extern CURLOption `{ CURLoption `}
