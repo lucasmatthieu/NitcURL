@@ -1,3 +1,18 @@
+#
+#
+# 
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+
 module curl
 import ffcurl
 
@@ -10,31 +25,29 @@ class Curl
 	var verbose:Bool
 	var status_code:nullable Int
 	var body_str:nullable String
-	#var headers: HashMap[String, Object]
+	var headers:nullable HashMap[String, Object]
 
 	init 
 	do
 		status_code=null
 		body_str=null
 		verbose=false
+		headers=false
 	end
 
-
+	# CONSTANTES
 	fun success_status_code:Int do return 200 end
 
+	# Cleaning method
 	fun cleanup(curl: nullable FFCurl, fle: nullable FFFile, err: nullable CURLCode):nullable String
 	do
 		if curl != null then curl.easy_clean
 		if fle != null then if not fle.clear then return "[ERROR] Something wrong during file cleaning process."
 		if err != null then return err.to_s
-
 		return null
 	end
 
-
-
-
-	# Download file from given url
+	# BEHAVIOR - Download file from given url
 	fun download(url: String, output_name: nullable String):nullable String
 	do
 		var dlObj = new FFCurl.easy_init
@@ -90,14 +103,9 @@ class Curl
 		dlObj.easy_clean
 
 		return null
-
 	end
 
-
-
-
-
-
+	# BEHAVIOR - 
 	fun get(url: String):nullable String
 	do
 		var dlObj = new FFCurl.easy_init
@@ -122,11 +130,7 @@ class Curl
 		return null
 	end
 
-
-
-
-
-
+	# BEHAVIOR -
 	fun mail(smtp: String, from: String, to: Array[String], user: String, pwd: String):nullable String
 	do
 		var dlObj = new FFCurl.easy_init
@@ -167,6 +171,4 @@ class Curl
 
 		return null
 	end
-
-
 end

@@ -8,31 +8,23 @@ in "C header" `{
 `}
 
 in "C body" `{
-
-	static size_t callback_write_todisk( void *buffer, size_t size, size_t nmenb, void *stream)
-	{
-		FILE *tgFile;
-		tgFile = (FILE*)stream;
+	static size_t callback_write_todisk( void *buffer, size_t size, size_t nmenb, void *stream){
+		FILE *tgFile; tgFile = (FILE*)stream;
 		if(!tgFile) return -1;
 		return fwrite( buffer, size, nmenb, tgFile);
 	}
-
 
 	struct fffile { FILE *file; char *filename; };
 `}
 
 
 extern CURLMailRecipients `{ struct curl_slist* `}
-	new `{ 
-		struct curl_slist *recipients = NULL;
-		return recipients;
-	`}
+	new `{ struct curl_slist *recipients = NULL; return recipients; `}
 	fun is_init:Bool `{ return recv != NULL;`}
 	#redef fun to_s
 end
 
 extern CURLCode `{ CURLcode `}
-
 	new unknown_option `{ return CURLE_UNKNOWN_OPTION; `}
 	fun code:Int `{ return recv; `}
 	fun is_ok:Bool `{ return recv == CURLE_OK; `}
@@ -62,30 +54,28 @@ extern FFFile `{ struct fffile* `}
 		if((*recv).filename != NULL) return remove((*recv).filename);
 		return 1; 
 	`}
-	fun release `{ 
-		(*recv).file=NULL; 
-		free((*recv).filename); 
-		(*recv).filename=NULL; 
-		free(recv);
-		recv=NULL;
+	fun release `{
+		if((*recv).file != NULL) (*recv).file=NULL; 
+		if((*recv).filename != NULL) free((*recv).filename); (*recv).filename=NULL; 
+		if(recv != NULL) free(recv); recv=NULL;
 	`}
 
 	fun clean:Bool
 	do
-		if remove != 0 then return false
+		if not remove == 0 then return false
 		release
 		return true
 	end
 	fun finish:Bool
 	do
-		if close != 0 then return false
+		if not close == 0 then return false
 		release
 		return true
 	end
 	fun clear:Bool 
 	do
-		if close != 0 then return false
-		if remove != 0 then return false
+		if not close == 0 then return false
+		if not remove == 0 then return false
 		release
 		return true
 	end
@@ -177,9 +167,7 @@ extern FFCurl `{ CURL * `}
 end
 
 
-extern CURLInfo `{ CURLINFO `}
-	new response_code `{ return CURLINFO_RESPONSE_CODE; `}
-end
+
 
 
 # Never released
@@ -194,7 +182,9 @@ extern CURLInfoResponse_long `{ long* `}
 	redef fun response:Int `{ return *recv; `}
 	fun to_i:Int do return to_s.to_i end
 end
-
+extern CURLInfo `{ CURLINFO `}
+	new response_code `{ return CURLINFO_RESPONSE_CODE; `}
+end
 extern CURLOption `{ CURLoption `}
 	new write_function `{ return CURLOPT_WRITEFUNCTION; `}
 	new write_data `{ return CURLOPT_WRITEDATA; `}
