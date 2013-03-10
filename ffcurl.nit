@@ -126,7 +126,7 @@ extern FFCurl `{ CURL * `}
 	`}
 	fun easy_getinfo(opt: CURLInfo):nullable CURLInfoResponse
 	do
-		if opt == new CURLInfo.response_code then
+		if [new CURLInfo.response_code].has(opt) then
 			var resp = new CURLInfoResponse_long
 			var curlcode = i_getinfo_long(opt, resp)
 			if not curlcode.is_ok then return null
@@ -171,6 +171,45 @@ end
 
 
 # Never released
+extern CURLStatusCode `{ int `}
+    new proceed `{ return 100; `}
+    new switching_protocols `{ return 101; `}
+    new ok `{ return 200; `}
+    new created `{ return 201; `}
+    new accepted `{ return 202; `}
+    new non_authoritative_information `{ return 203; `}
+    new no_content `{ return 204; `}
+    new reset_content `{ return 205; `}
+    new partial_content `{ return 206; `}
+    new multiple_choices `{ return 300; `}
+    new moved_permanently `{ return 301; `}
+    new moved_temporarily `{ return 302; `}
+    new see_other `{ return 303; `}
+    new not_modified `{ return 304; `}
+    new use_proxy `{ return 305; `}
+    new bad_request `{ return 400; `}
+    new unauthorized `{ return 401; `}
+    new payment_required `{ return 402; `}
+    new forbidden `{ return 403; `}
+    new not_found `{ return 404; `}
+    new method_not_allowed `{ return 405; `}
+    new not_acceptable `{ return 406; `}
+    new proxy_authentication_required `{ return 407; `}
+    new request_timeout `{ return 408; `}
+    new conflict `{ return 409; `}
+    new gone `{ return 410; `}
+    new length_required `{ return 411; `}
+    new precondition_failed `{ return 412; `}
+    new request_entity_too_large `{ return 413; `}
+    new request_uri_too_large `{ return 414; `}
+    new unsupported_media_type `{ return 415; `}
+    new internal_server_error `{ return 500; `}
+    new not_implemented `{ return 501; `}
+    new bad_gateway `{ return 502; `}
+    new service_unavailable `{ return 503; `}
+    new gateway_timeout `{ return 504; `}
+    new http_version_not_supported `{ return 505; `}
+end
 extern CURLInfoResponse `{ void* `}
 	fun response:nullable Object do return null end
 	redef fun to_s do return response.to_s end
@@ -188,7 +227,6 @@ end
 extern CURLOption `{ CURLoption `}
 	new write_function `{ return CURLOPT_WRITEFUNCTION; `}
 	new write_data `{ return CURLOPT_WRITEDATA; `}
-
 #	new  `{ return CURLOPT_FILE; `}
 	new url `{ return CURLOPT_URL; `}
 #	new  `{ return CURLOPT_PORT; `}

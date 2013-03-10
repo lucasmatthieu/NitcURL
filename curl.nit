@@ -35,9 +35,6 @@ class Curl
 		headers=null
 	end
 
-	# CONSTANTES
-	fun success_status_code:Int do return 200 end
-
 	# Cleaning method
 	fun cleanup(curl: nullable FFCurl, fle: nullable FFFile, err: nullable CURLCode):nullable String
 	do
@@ -88,7 +85,7 @@ class Curl
 		var answ = dlObj.easy_getinfo(new CURLInfo.response_code)
 		if not answ == null then self.status_code = answ.to_s.to_i
 
-		if not self.status_code == self.success_status_code then return cleanup(dlObj, optFile, null)
+		if not self.status_code == new CURLStatusCode.ok then return cleanup(dlObj, optFile, null)
 
 		if not optFile.finish then 
 			if not optFile.clean then
