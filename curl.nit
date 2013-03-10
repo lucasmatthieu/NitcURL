@@ -85,6 +85,9 @@ class Curl
 		var answ = dlObj.easy_getinfo(new CURLInfo.response_code)
 		if not answ == null then self.status_code = answ.to_s.to_i
 
+		var header_size = dlObj.easy_getinfo(new CURLInfo.header_size)
+		print "Header size =="+header_size.to_s
+
 		if not self.status_code == new CURLStatusCode.ok then return cleanup(dlObj, optFile, null)
 
 		if not optFile.finish then 

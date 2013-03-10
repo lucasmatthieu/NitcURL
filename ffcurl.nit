@@ -126,7 +126,7 @@ extern FFCurl `{ CURL * `}
 	`}
 	fun easy_getinfo(opt: CURLInfo):nullable CURLInfoResponse
 	do
-		if [new CURLInfo.response_code].has(opt) then
+		if [new CURLInfo.response_code, new CURLInfo.header_size].has(opt) then
 			var resp = new CURLInfoResponse_long
 			var curlcode = i_getinfo_long(opt, resp)
 			if not curlcode.is_ok then return null
@@ -223,6 +223,7 @@ extern CURLInfoResponse_long `{ long* `}
 end
 extern CURLInfo `{ CURLINFO `}
 	new response_code `{ return CURLINFO_RESPONSE_CODE; `}
+	new header_size `{ return CURLINFO_HEADER_SIZE; `}
 end
 extern CURLOption `{ CURLoption `}
 	new write_function `{ return CURLOPT_WRITEFUNCTION; `}
