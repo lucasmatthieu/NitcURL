@@ -90,6 +90,7 @@ class Curl
 
 		if not self.status_code == new CURLStatusCode.ok then return cleanup(dlObj, optFile, null)
 
+
 		if not optFile.finish then 
 			if not optFile.clean then
 				optFile.release

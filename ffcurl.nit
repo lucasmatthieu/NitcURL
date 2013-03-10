@@ -132,7 +132,6 @@ extern FFCurl `{ CURL * `}
 			if not curlcode.is_ok then return null
 			return resp
 		end
-
 		return null
 	end
 
@@ -171,6 +170,21 @@ end
 
 
 # Never released
+extern CURLInfoResponse `{ void* `}
+	fun response:nullable Object do return null end
+	redef fun to_s do return response.to_s end
+	fun release `{ if(recv != NULL) free(recv); recv=NULL; `}
+end
+extern CURLInfoResponse_long `{ long* `}
+	super CURLInfoResponse
+	new `{ return (long*)malloc(sizeof(long));`}
+	redef fun response:Int `{ return *recv; `}
+	fun to_i:Int do return to_s.to_i end
+end
+extern CURLInfo `{ CURLINFO `}
+	new response_code `{ return CURLINFO_RESPONSE_CODE; `}
+	new header_size `{ return CURLINFO_HEADER_SIZE; `}
+end
 extern CURLStatusCode `{ int `}
     new proceed `{ return 100; `}
     new switching_protocols `{ return 101; `}
@@ -209,21 +223,6 @@ extern CURLStatusCode `{ int `}
     new service_unavailable `{ return 503; `}
     new gateway_timeout `{ return 504; `}
     new http_version_not_supported `{ return 505; `}
-end
-extern CURLInfoResponse `{ void* `}
-	fun response:nullable Object do return null end
-	redef fun to_s do return response.to_s end
-	fun release `{ if(recv != NULL) free(recv); recv=NULL; `}
-end
-extern CURLInfoResponse_long `{ long* `}
-	super CURLInfoResponse
-	new `{ return (long*)malloc(sizeof(long));`}
-	redef fun response:Int `{ return *recv; `}
-	fun to_i:Int do return to_s.to_i end
-end
-extern CURLInfo `{ CURLINFO `}
-	new response_code `{ return CURLINFO_RESPONSE_CODE; `}
-	new header_size `{ return CURLINFO_HEADER_SIZE; `}
 end
 extern CURLOption `{ CURLoption `}
 	new write_function `{ return CURLOPT_WRITEFUNCTION; `}
