@@ -1,39 +1,25 @@
-#
-#
-# 
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
-
 module curl
 import ffcurl
 
-
-#abstract curl
 class Curl
-	
-	var verbose:Bool
+	super FFCurlCallbacks
+
+	var verbose:Bool writable
 	var status_code:nullable Int
-	var body_str:nullable String
-	var headers:nullable HashMap[String, Object]
+	var body_str:String
+	var headers:nullable HashMap[String, String]
+	private var i_file:nullable OFile
 
 	init 
 	do
 		status_code=null
-		body_str=null
+		body_str=""
 		verbose=false
 		headers=null
+		i_file=null
 	end
 
-	# Cleaning method
+	# Cleaning
 	fun cleanup(curl: nullable FFCurl, fle: nullable OFile, err: nullable CURLCode):nullable String
 	do
 		if curl != null then curl.easy_clean
@@ -42,58 +28,7 @@ class Curl
 		return null
 	end
 
-	# BEHAVIOR - Download file from given url
-	fun download(url: String, output_name: nullable String):nullable String
-	do
-		# Configuration
-		var dlObj = new FFCurl.easy_init
-		if not dlObj.is_init then return "[ERROR] Unable to init curl"
-
-		var err:CURLCode
-		
-		err = dlObj.setopt(new CURLOption.url, url)
-		if not err.is_ok then return cleanup(dlObj, null, err)
-
-		err = dlObj.setopt(new CURLOption.follow_location, 1)
-		if not err.is_ok then return cleanup(dlObj, null, err)
-
-		err = dlObj.setopt(new CURLOption.verbose, self.verbose)
-		if not err.is_ok then return cleanup(dlObj, null, err)
-		
-		var optName:nullable String
-		if not output_name == null then 
-			optName = output_name
-		else if not url.substring(url.length-1, url.length) == "/" then
-			optName = url.basename("") 
-		else
-			cleanup(dlObj, null, null)
-			return "[ERROR] Unable to treat url to get basename"
-		end
-
-		var optFile = new OFile.open(optName.to_cstring)
-		if not optFile.is_valid then 
-			cleanup(dlObj, optFile, null)
-			return "[ERROR] Unable to create file"
-		end
-		err = dlObj.setopt(new CURLOption.write_data, optFile)
-		if not err.is_ok then return cleanup(dlObj, optFile, err)
-
-		err = dlObj.easy_perform
-		if not err.is_ok then return cleanup(dlObj, optFile, err)
-		
-		# Response
-		var answ = dlObj.easy_getinfo(new CURLInfo.response_code)
-		if not answ == null then self.status_code = answ.response.as(Int)
-		
-		var header_size = dlObj.easy_getinfo(new CURLInfo.header_size)
-
-		# Final cleaning
-		cleanup(dlObj, optFile, null)
-
-		return null
-	end
-
-	# BEHAVIOR - 
+	# Behaviors
 	fun get(url: String):nullable String
 	do
 		var dlObj = new FFCurl.easy_init
@@ -110,53 +45,91 @@ class Curl
 		err = dlObj.setopt(new CURLOption.verbose, self.verbose)
 		if not err.is_ok then return cleanup(dlObj, null, err)
 		
+		err = dlObj.register_callback(self, new CURLCallbackType.header)
+		if not err.is_ok then return cleanup(dlObj, null, err)
+
+		err = dlObj.register_callback(self, new CURLCallbackType.body)
+		if not err.is_ok then return cleanup(dlObj, null, err)
+
 		err = dlObj.easy_perform
 		if not err.is_ok then return cleanup(dlObj, null, err)
-		
-		dlObj.easy_clean
+
+		var answ = dlObj.easy_getinfo(new CURLInfo.response_code)
+		if not answ == null then self.status_code = answ.response.as(Int)
+
+		cleanup(dlObj, null, null)
 
 		return null
 	end
 
-	# BEHAVIOR -
-	fun mail(smtp: String, from: String, to: Array[String], user: String, pwd: String):nullable String
+	fun download(url: String, output_name: nullable String):nullable String
 	do
 		var dlObj = new FFCurl.easy_init
 		if not dlObj.is_init then return "[ERROR] Unable to init curl"
 
 		var err:CURLCode
-
-		err = dlObj.setopt(new CURLOption.url, smtp)
+		
+		err = dlObj.setopt(new CURLOption.url, url)
 		if not err.is_ok then return cleanup(dlObj, null, err)
 
 		err = dlObj.setopt(new CURLOption.follow_location, 1)
 		if not err.is_ok then return cleanup(dlObj, null, err)
 
-		err = dlObj.setopt(new CURLOption.verbose, 1)
-		if not err.is_ok then return cleanup(dlObj, null, err)
-		# AUTH
-		err = dlObj.setopt(new CURLOption.username, user)
-		if not err.is_ok then return cleanup(dlObj, null, err)
-		
-		err = dlObj.setopt(new CURLOption.password, pwd)
-		if not err.is_ok then return cleanup(dlObj, null, err)
-		
-		# INFO
-		err = dlObj.setopt(new CURLOption.mail_from, from)
-		if not err.is_ok then return cleanup(dlObj, null, err)
-		
-		err = dlObj.setopt(new CURLOption.mail_rcpt, to)
+		err = dlObj.setopt(new CURLOption.verbose, self.verbose)
 		if not err.is_ok then return cleanup(dlObj, null, err)
 
+		var optName:nullable String
+		if not output_name == null then 
+			optName = output_name
+		else if not url.substring(url.length-1, url.length) == "/" then
+			optName = url.basename("") 
+		else
+			cleanup(dlObj, null, null)
+			return "[ERROR] Unable to treat url to get basename"
+		end
 
-		#err = dlObj.setopt(new CURLOption.write_data, optFile)
-		#if not err.is_ok then return cleanup(dlObj, optFile, err)
+		self.i_file = new OFile.open(optName.to_cstring)
+		if not self.i_file.is_valid then 
+			cleanup(dlObj, self.i_file, null)
+			return "[ERROR] Unable to create file"
+		end
+
+		err = dlObj.register_callback(self, new CURLCallbackType.header)
+		if not err.is_ok then return cleanup(dlObj, self.i_file, err)
+
+		err = dlObj.register_callback(self, new CURLCallbackType.stream)
+		if not err.is_ok then return cleanup(dlObj, self.i_file, err)
 
 		err = dlObj.easy_perform
-		if not err.is_ok then return cleanup(dlObj, null, err)
+		if not err.is_ok then return cleanup(dlObj, self.i_file, err)		
 
-		dlObj.easy_clean
+		var answ = dlObj.easy_getinfo(new CURLInfo.response_code)
+		if not answ == null then self.status_code = answ.response.as(Int)
+
+		cleanup(dlObj, self.i_file, null)
 
 		return null
 	end
+
+	# Callbacks
+	redef fun header_callback(line: String)
+	do
+		if self.headers == null then self.headers = new HashMap[String, String]
+		var splitted = line.split_with(':')
+		if splitted.length > 1 then
+			var key = splitted.shift
+			self.headers[key] = splitted.to_s
+		end
+	end
+
+	redef fun body_callback(line: String)
+	do
+		self.body_str += line
+	end
+
+	redef fun stream_callback(buffer: String, size: Int, count: Int)
+	do
+		self.i_file.write(buffer, size, count)
+	end
+
 end

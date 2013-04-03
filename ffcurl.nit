@@ -4,32 +4,48 @@ in "C header" `{
 	#include <stdio.h>
 	#include <stdlib.h>
 	#include <curl/curl.h>
+
+	typedef enum {
+		CURLcallbackTypeHeader,
+		CURLcallbackTypeBody,
+		CURLcallbackTypeStream
+	} CURLcallbackType;
+
+	typedef struct {
+		FFCurlCallbacks delegate;
+		CURLcallbackType type;
+	} CURLCallbackDatas;
+
 `}
 
 in "C body" `{
-	static size_t callback_write_todisk( void *buffer, size_t size, size_t nmenb, void *stream){
-		FILE *tgFile; tgFile = (FILE*)stream;
-		if(!tgFile) return -1;
-		return fwrite( buffer, size, nmenb, tgFile);
-	}
-	/*static size_t callback_write_tochar( void *buffer, size_t size, size_t nmenb, void *stream){
-		char *t = (char*)stream;
-		
-		if(!t) return -1;
-		else
-		{
-			// reassigner de la mémoire pr le flux ?
-			// += stream
+	size_t nit_curl_callback_func(void *buffer, size_t size, size_t count, CURLCallbackDatas *datas){
+		char *line_c = (char*)buffer;
+		String line_o = new_String_from_cstring(line_c);
+		switch(datas->type){
+			case CURLcallbackTypeHeader:
+				FFCurlCallbacks_header_callback(datas->delegate, line_o);
+				break;
+			case CURLcallbackTypeBody:
+				FFCurlCallbacks_body_callback(datas->delegate, line_o);
+				break;
+			case CURLcallbackTypeStream:
+				FFCurlCallbacks_stream_callback(datas->delegate, line_o, size, count);
+				break;
+			default:
+				break;
 		}
-	}*/
+		return count;
+	}
 `}
 
 extern FFCurl `{ CURL * `}
+	
 	# Lifetime
 	new easy_init `{ return curl_easy_init();`}
 	fun is_init:Bool `{ return (recv != NULL); `}
 	fun easy_clean `{ curl_easy_cleanup( recv ); `}
-	fun easy_perform:CURLCode `{ return curl_easy_perform( recv ); `}
+	fun easy_perform:CURLCode `{ return curl_easy_perform( recv ); `}	
 
 	# Set options
 	fun setopt(opt: CURLOption, obj: Object):CURLCode
@@ -37,39 +53,26 @@ extern FFCurl `{ CURL * `}
 		if obj isa Int then
 			return i_setopt_int(opt, obj)
 		else if obj isa Bool then
-			return i_setopt_int(opt, obj.to_s.to_i)
+			if obj == true then 
+				return i_setopt_int(opt, 1)
+			else if obj == false then 
+				return i_setopt_int(opt, 0)
+			end
 		else if obj isa String then 
 			return i_setopt_string(opt, obj)
 		else if obj isa OFile then
 			return i_setopt_file(opt, obj)
-		#else if obj isa Array[String] then
-		#	var mail_recpts= new CURLMailRecipients
-		#	mail_recpts=i_add_recipients(mail_recpts, obj[0])
-		#	return i_setopt_recipients(opt, mail_recpts)
 		end
-		return new CURLCode.unknown_option
+		return once new CURLCode.unknown_option
 	end
-	fun i_setopt_int(opt: CURLOption, num: Int):CURLCode `{ 
-		return curl_easy_setopt( recv, opt, num); 
-	`}
-	fun i_setopt_string(opt: CURLOption, str: String):CURLCode import String::to_cstring `{
-		char *rStr = String_to_cstring(str);
+	private fun i_setopt_file(opt: CURLOption, fl: OFile):CURLCode `{ return curl_easy_setopt( recv, opt, fl); `}
+	private fun i_setopt_int(opt: CURLOption, num: Int):CURLCode `{ return curl_easy_setopt( recv, opt, num); `}
+	private fun i_setopt_string(opt: CURLOption, str: String):CURLCode import String::to_cstring `{
+		char *rStr = String_to_cstring(str); 
 		return curl_easy_setopt( recv, opt, rStr);
-	`}
-	fun i_setopt_file(opt: CURLOption, fl: OFile):CURLCode `{ 
-		return curl_easy_setopt( recv, opt, fl); 
-	`}
-	# @TOKNOW COMPORTEMENT PAR DEFAUT
-	fun f_setopt_writetodisk_callback:CURLCode `{
-		return curl_easy_setopt( recv, CURLOPT_WRITEFUNCTION, callback_write_todisk);
 	`}
 
 	# Get infos
-	fun i_getinfo_long(opt: CURLInfo, res: MutableInt):CURLCode import MutableInt::value= `{
-		long r; CURLcode c = curl_easy_getinfo( recv, opt, &r);
-		MutableInt_value__assign( res, r);
-		return c;
-	`}
 	fun easy_getinfo(opt: CURLInfo):nullable CURLInfoResponse
 	do
 		if once [new CURLInfo.response_code, new CURLInfo.header_size].has(opt) then
@@ -82,24 +85,80 @@ extern FFCurl `{ CURL * `}
 		end
 		return null
 	end
+	private fun i_getinfo_long(opt: CURLInfo, res: MutableInt):CURLCode import MutableInt::value= `{
+		long r; CURLcode c = curl_easy_getinfo( recv, opt, &r);
+		MutableInt_value__assign( res, r);
+		return c;
+	`}
 
-	# Mail
-	#fun i_add_recipients(recpt:CURLMailRecipients, str:String):CURLMailRecipients import String::to_cstring `{
-	#	char *rStr = String_to_cstring(str);
-	#	return curl_slist_append(recpt, rStr);
-	#`}
-	#fun i_setopt_recipients(opt:CURLOption, rcp:CURLMailRecipients):CURLCode `{
-	#	return curl_easy_setopt( recv, opt, rcp);
-	#`}
-	# @MAKE MORE GENERIC
-	#fun clean_list(rcpt:CURLMailRecipients) `{
-	#@	return curl_slist_free_all(rcpt);
-	#`}
+	# Register delegate callback
+	fun register_callback(delegate: FFCurlCallbacks, cbtype: CURLCallbackType):CURLCode
+	do
+		if cbtype == once new CURLCallbackType.header then
+			return i_callback_register(delegate, cbtype)
+		else if cbtype == once new CURLCallbackType.body then
+			return i_callback_register(delegate, cbtype)
+		else if cbtype == once new CURLCallbackType.stream then
+			return i_callback_register(delegate, cbtype)
+		end
+		return once new CURLCode.unknown_option
+	end
+	private fun i_callback_register(delegate: FFCurlCallbacks, cbtype: CURLCallbackType):CURLCode is extern import FFCurlCallbacks::header_callback,  FFCurlCallbacks::body_callback, FFCurlCallbacks::stream_callback  `{
+		CURLCallbackDatas *d = malloc(sizeof(CURLCallbackDatas));
+		FFCurlCallbacks_incr_ref(delegate);
+		d->type = cbtype;
+		d->delegate = delegate;
+
+		CURLcode e;
+		switch(cbtype){
+			case CURLcallbackTypeHeader:
+				e = curl_easy_setopt( recv, CURLOPT_HEADERFUNCTION, &nit_curl_callback_func);
+				if(e != CURLE_OK) return e;
+				e = curl_easy_setopt( recv, CURLOPT_WRITEHEADER, d);
+				break;
+			case CURLcallbackTypeBody:
+			case CURLcallbackTypeStream:
+				e = curl_easy_setopt( recv, CURLOPT_WRITEFUNCTION, &nit_curl_callback_func);
+				if(e != CURLE_OK) return e;
+				e = curl_easy_setopt( recv, CURLOPT_WRITEDATA, d);
+				break;
+			default:
+				break;
+		}
+		return e;
+	`}
+
+end
+
+interface FFCurlCallbacks
+	fun header_callback(line: String) is abstract
+	fun body_callback(line: String) is abstract
+	fun stream_callback(buffer: String, size: Int, count: Int) is abstract
+end
+interface CURLInfoResponse
+	fun response:nullable Object do return null end
+end
+
+class MutableInt
+	var value: Int=0
+end
+redef class Int
+	super CURLInfoResponse 
+	redef fun response:nullable Int do return self end
 end
 
 extern OFile `{ FILE* `}
 	new open(str: NativeString) `{ return fopen(str, "wb"); `}
 	fun is_valid:Bool `{ return recv != NULL; `}
+
+	private fun n_write(buffer: NativeString, size: Int, count: Int):Int `{ 
+		return fwrite(buffer, size, count, recv); 
+	`}
+	fun write(buffer: String, size: Int, count: Int):Int
+	do
+		if not is_valid == false then return n_write(buffer.to_cstring, size, count)
+		return 0
+	end
 	private fun n_close:Int `{ return fclose(recv); `}
 	fun close:Bool
 	do 
@@ -107,32 +166,12 @@ extern OFile `{ FILE* `}
 		return false
 	end
 end
-
-#extern CURLMailRecipients `{ struct curl_slist* `}
-#	new `{ struct curl_slist *recipients = NULL; return recipients; `}
-#	fun is_init:Bool `{ return recv != NULL;`}
-#	#redef fun to_s
-#end
-
-class MutableInt
-	var value: Int=0
+extern CURLCallbackType `{ CURLcallbackType `}
+	new header `{ return CURLcallbackTypeHeader; `}
+	new body `{ return CURLcallbackTypeBody; `}
+	new stream `{ return CURLcallbackTypeStream; `}
+	fun to_i:Int `{ return recv; `} 
 end
-class MutableString
-	var value: String=""
-end
-
-interface CURLInfoResponse
-	fun response:nullable Object do return null end
-end
-redef class Int
-	super CURLInfoResponse 
-	redef fun response:nullable Int do return self end
-end
-redef class String 
-	super CURLInfoResponse
-	redef fun response:nullable String do return self end
-end
-
 extern CURLCode `{ CURLcode `}
 	new unknown_option `{ return CURLE_UNKNOWN_OPTION; `}
 	fun code:Int `{ return recv; `}
@@ -147,44 +186,44 @@ extern CURLInfo `{ CURLINFO `}
 	new content_type `{ return CURLINFO_CONTENT_TYPE; `}
 end
 extern CURLStatusCode `{ int `}
-    	new proceed `{ return 100; `}
-    	new switching_protocols `{ return 101; `}
-    	new ok `{ return 200; `}
-   	new created `{ return 201; `}
-    	new accepted `{ return 202; `}
-    	new non_authoritative_information `{ return 203; `}
-    	new no_content `{ return 204; `}
-    	new reset_content `{ return 205; `}
-    	new partial_content `{ return 206; `}
-    	new multiple_choices `{ return 300; `}
-    	new moved_permanently `{ return 301; `}
-    	new moved_temporarily `{ return 302; `}
-    	new see_other `{ return 303; `}
-    	new not_modified `{ return 304; `}
-    	new use_proxy `{ return 305; `}
-    	new bad_request `{ return 400; `}
-    	new unauthorized `{ return 401; `}
-    	new payment_required `{ return 402; `}
-    	new forbidden `{ return 403; `}
-    	new not_found `{ return 404; `}
-    	new method_not_allowed `{ return 405; `}
-    	new not_acceptable `{ return 406; `}
-    	new proxy_authentication_required `{ return 407; `}
-    	new request_timeout `{ return 408; `}
-    	new conflict `{ return 409; `}
-    	new gone `{ return 410; `}
-    	new length_required `{ return 411; `}
-    	new precondition_failed `{ return 412; `}
-    	new request_entity_too_large `{ return 413; `}
-    	new request_uri_too_large `{ return 414; `}
-    	new unsupported_media_type `{ return 415; `}
-    	new internal_server_error `{ return 500; `}
-    	new not_implemented `{ return 501; `}
-    	new bad_gateway `{ return 502; `}
-    	new service_unavailable `{ return 503; `}
-    	new gateway_timeout `{ return 504; `}
-    	new http_version_not_supported `{ return 505; `}
-    	fun to_i:Int `{ return recv; `} 
+	new proceed `{ return 100; `}
+	new switching_protocols `{ return 101; `}
+	new ok `{ return 200; `}
+	new created `{ return 201; `}
+	new accepted `{ return 202; `}
+	new non_authoritative_information `{ return 203; `}
+	new no_content `{ return 204; `}
+	new reset_content `{ return 205; `}
+	new partial_content `{ return 206; `}
+	new multiple_choices `{ return 300; `}
+	new moved_permanently `{ return 301; `}
+	new moved_temporarily `{ return 302; `}
+	new see_other `{ return 303; `}
+	new not_modified `{ return 304; `}
+	new use_proxy `{ return 305; `}
+	new bad_request `{ return 400; `}
+	new unauthorized `{ return 401; `}
+	new payment_required `{ return 402; `}
+	new forbidden `{ return 403; `}
+	new not_found `{ return 404; `}
+	new method_not_allowed `{ return 405; `}
+	new not_acceptable `{ return 406; `}
+	new proxy_authentication_required `{ return 407; `}
+	new request_timeout `{ return 408; `}
+	new conflict `{ return 409; `}
+	new gone `{ return 410; `}
+	new length_required `{ return 411; `}
+	new precondition_failed `{ return 412; `}
+	new request_entity_too_large `{ return 413; `}
+	new request_uri_too_large `{ return 414; `}
+	new unsupported_media_type `{ return 415; `}
+	new internal_server_error `{ return 500; `}
+	new not_implemented `{ return 501; `}
+	new bad_gateway `{ return 502; `}
+	new service_unavailable `{ return 503; `}
+	new gateway_timeout `{ return 504; `}
+	new http_version_not_supported `{ return 505; `}
+	fun to_i:Int `{ return recv; `} 
 end
 extern CURLOption `{ CURLoption `}
 	new write_function `{ return CURLOPT_WRITEFUNCTION; `}
@@ -389,4 +428,3 @@ extern CURLOption `{ CURLoption `}
 #	new  `{ return CURLOPT_SSL_OPTIONS; `}
 #	new  `{ return CURLOPT_MAIL_AUTH; `}
 end
-
