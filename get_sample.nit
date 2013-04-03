@@ -1,4 +1,4 @@
-module get_curlsample
+module get_sample
 import curl
 
 fun usage
