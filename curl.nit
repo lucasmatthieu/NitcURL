@@ -60,8 +60,8 @@ class Curl
 		err = dlObj.easy_perform
 		if not err.is_ok then return cleanup(dlObj, null, err)
 
-		var answ = dlObj.easy_getinfo(new CURLInfo.response_code)
-		if not answ == null then self.status_code = answ.response.as(Int)
+    var st_code = dlObj.easy_getinfo_long(new CURLInfoLong.response_code)
+		if not st_code == null then self.status_code = st_code.response
 
 		cleanup(dlObj, null, null)
 
@@ -109,17 +109,17 @@ class Curl
 		err = dlObj.easy_perform
 		if not err.is_ok then return cleanup(dlObj, self.i_file, err)		
 
-		var answ = dlObj.easy_getinfo(new CURLInfo.response_code)
-    if not answ == null then self.status_code = answ.response.as(Int)
+    var st_code = dlObj.easy_getinfo_long(new CURLInfoLong.response_code)
+    if not st_code == null then self.status_code = st_code.response
 
-    var speed = dlObj.easy_getinfo(new CURLInfo.speed_download)
-    if not speed == null then self.speed_download = speed.response.as(Int)
+    var speed = dlObj.easy_getinfo_double(new CURLInfoDouble.speed_download)
+    if not speed == null then self.speed_download = speed.response
 
-    var size = dlObj.easy_getinfo(new CURLInfo.size_download)
-    if not size == null then self.size_download = size.response.as(Int)
+    var size = dlObj.easy_getinfo_double(new CURLInfoDouble.size_download)
+    if not size == null then self.size_download = size.response
 
-    var time = dlObj.easy_getinfo(new CURLInfo.total_time)
-    if not time == null then self.total_time = time.response.as(Int)
+    var time = dlObj.easy_getinfo_double(new CURLInfoDouble.total_time)
+    if not time == null then self.total_time = time.response
 
 		cleanup(dlObj, self.i_file, null)
 
