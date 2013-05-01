@@ -15,7 +15,6 @@ in "C header" `{
 		FFCurlCallbacks delegate;
 		CURLcallbackType type;
 	} CURLCallbackDatas;
-
 `}
 
 in "C body" `{
@@ -40,56 +39,78 @@ in "C body" `{
 `}
 
 extern FFCurl `{ CURL * `}
-	
+
 	# Lifetime
-	new easy_init `{ return curl_easy_init();`}
+	new easy_init `{ return curl_easy_init(); `}
 	fun is_init:Bool `{ return (recv != NULL); `}
 	fun easy_clean `{ curl_easy_cleanup( recv ); `}
 	fun easy_perform:CURLCode `{ return curl_easy_perform( recv ); `}	
 
 	# Set options
-	fun setopt(opt: CURLOption, obj: Object):CURLCode
+	fun easy_setopt(opt: CURLOption, obj: Object):CURLCode
 	do
-		if obj isa Int then
-			return i_setopt_int(opt, obj)
-		else if obj isa Bool then
-			if obj == true then 
-				return i_setopt_int(opt, 1)
-			else if obj == false then 
-				return i_setopt_int(opt, 0)
-			end
-		else if obj isa String then 
-			return i_setopt_string(opt, obj)
-		else if obj isa OFile then
-			return i_setopt_file(opt, obj)
-		end
-		return once new CURLCode.unknown_option
+		if obj isa Int then return i_setopt_int(opt, obj)
+		if obj isa Bool and obj == true then return i_setopt_int(opt, 1)
+		if obj isa Bool and obj == false then return i_setopt_int(opt, 0)
+		if obj isa String then return i_setopt_string(opt, obj)
+		if obj isa OFile then return i_setopt_file(opt, obj)
+    return once new CURLCode.unknown_option
 	end
 	private fun i_setopt_file(opt: CURLOption, fl: OFile):CURLCode `{ return curl_easy_setopt( recv, opt, fl); `}
 	private fun i_setopt_int(opt: CURLOption, num: Int):CURLCode `{ return curl_easy_setopt( recv, opt, num); `}
 	private fun i_setopt_string(opt: CURLOption, str: String):CURLCode import String::to_cstring `{
-		char *rStr = String_to_cstring(str); 
+		char *rStr = String_to_cstring(str);
 		return curl_easy_setopt( recv, opt, rStr);
 	`}
 
 	# Get infos
 	fun easy_getinfo(opt: CURLInfo):nullable CURLInfoResponse
 	do
-		if once [new CURLInfo.response_code, new CURLInfo.header_size].has(opt) then
+    var infoSet = new CURLInfoSetType
+		if infoSet.long.has(opt) then
 			var resp = once new MutableInt
 			var curlcode = i_getinfo_long(opt, resp)
 			if not curlcode.is_ok then return null
 			return resp.value
-		else if once [new CURLInfo.content_type].has(opt) then
-			return null
+    else if infoSet.double.has(opt) then
+			var resp = once new MutableInt
+			var curlcode = i_getinfo_double(opt, resp)
+			if not curlcode.is_ok then return null
+			return resp.value
+		else if infoSet.string.has(opt) then
+			var resp = once new MutableString
+			var curlcode = i_getinfo_chars(opt, resp)
+			if not curlcode.is_ok then return null
+			return resp.value
 		end
 		return null
 	end
-	private fun i_getinfo_long(opt: CURLInfo, res: MutableInt):CURLCode import MutableInt::value= `{
-		long r; CURLcode c = curl_easy_getinfo( recv, opt, &r);
-		MutableInt_value__assign( res, r);
+	private fun i_getinfo_chars(opt: CURLInfo, res: MutableString):CURLCode import MutableString::value= `{
+		char *r = NULL;
+    CURLcode c = curl_easy_getinfo( recv, opt, &r);
+    if((c == CURLE_OK) && r != NULL){
+      String ro = new_String_from_cstring(r);
+	  	MutableString_value__assign( res, ro);
+    }
 		return c;
 	`}
+	private fun i_getinfo_long(opt: CURLInfo, res: MutableInt):CURLCode import MutableInt::value= `{
+		long *r = NULL;
+    r = malloc(sizeof(long));
+    CURLcode c = curl_easy_getinfo( recv, CURLINFO_RESPONSE_CODE, r);
+    if((c == CURLE_OK) && r != NULL) MutableInt_value__assign( res, (long)*r);
+    free(r);
+    return c;
+	`}
+  private fun i_getinfo_double(opt: CURLInfo, res: MutableInt):CURLCode import MutableInt::value= `{
+    double *r = NULL;
+    r = malloc(sizeof(double));
+    CURLcode c = curl_easy_getinfo( recv, opt, r);
+    if((c == CURLE_OK) && r != NULL) MutableInt_value__assign( res, (double)*r);
+    free(r);
+    return c;
+	`}
+
 
 	# Register delegate callback
 	fun register_callback(delegate: FFCurlCallbacks, cbtype: CURLCallbackType):CURLCode
@@ -139,6 +160,15 @@ interface CURLInfoResponse
 	fun response:nullable Object do return null end
 end
 
+
+class MutableString
+	var value: String=""
+end
+redef class String
+	super CURLInfoResponse
+	redef fun response:nullable String do return self end
+end
+
 class MutableInt
 	var value: Int=0
 end
@@ -150,10 +180,7 @@ end
 extern OFile `{ FILE* `}
 	new open(str: NativeString) `{ return fopen(str, "wb"); `}
 	fun is_valid:Bool `{ return recv != NULL; `}
-
-	private fun n_write(buffer: NativeString, size: Int, count: Int):Int `{ 
-		return fwrite(buffer, size, count, recv); 
-	`}
+	private fun n_write(buffer: NativeString, size: Int, count: Int):Int `{ return fwrite(buffer, size, count, recv); `}
 	fun write(buffer: String, size: Int, count: Int):Int
 	do
 		if not is_valid == false then return n_write(buffer.to_cstring, size, count)
@@ -181,9 +208,59 @@ extern CURLCode `{ CURLcode `}
 	redef fun to_s do return code.to_s end
 end
 extern CURLInfo `{ CURLINFO `}
-	new response_code `{ return CURLINFO_RESPONSE_CODE; `}
-	new header_size `{ return CURLINFO_HEADER_SIZE; `}
+	# Long CURLInfoSetType - Long*
+  new response_code `{ return CURLINFO_RESPONSE_CODE; `}
+  new header_size `{ return CURLINFO_HEADER_SIZE; `}
+  new http_connectcode `{ return CURLINFO_HTTP_CONNECTCODE; `}
+  new filetime `{ return CURLINFO_FILETIME; `}
+  new redirect_count `{ return CURLINFO_REDIRECT_COUNT; `}
+  new request_size `{ return CURLINFO_REQUEST_SIZE; `}
+  new ssl_verifyresult `{ return CURLINFO_SSL_VERIFYRESULT; `}
+  new httpauth_avail `{ return CURLINFO_HTTPAUTH_AVAIL; `}
+  new proxyauth_avail `{ return CURLINFO_PROXYAUTH_AVAIL; `}
+  new os_errno `{ return CURLINFO_OS_ERRNO; `}
+  new num_connects `{ return CURLINFO_NUM_CONNECTS; `}
+  new primary_port `{ return CURLINFO_PRIMARY_PORT; `}
+  new local_port `{ return CURLINFO_LOCAL_PORT; `}
+  new lastsocket `{ return CURLINFO_LASTSOCKET; `}
+  new condition_unmet `{ return CURLINFO_CONDITION_UNMET; `}
+  new rtsp_client_cseq `{ return CURLINFO_RTSP_CLIENT_CSEQ; `}
+  new rtsp_server_cseq `{ return CURLINFO_RTSP_SERVER_CSEQ; `}
+  new rtsp_cseq_recv `{ return CURLINFO_RTSP_CSEQ_RECV; `}
+  # Double CURLInfoSetType - Double*
+  new total_time `{ return CURLINFO_TOTAL_TIME; `}
+  new namelookup_time `{ return CURLINFO_NAMELOOKUP_TIME; `}
+  new connect_time `{ return CURLINFO_CONNECT_TIME; `}
+  new appconnect_time `{ return CURLINFO_APPCONNECT_TIME; `}
+  new pretransfer_time `{ return CURLINFO_PRETRANSFER_TIME; `}
+  new starttransfer_time `{ return CURLINFO_STARTTRANSFER_TIME; `}
+  new redirect_time `{ return CURLINFO_REDIRECT_TIME; `}
+  new size_upload `{ return CURLINFO_SIZE_UPLOAD; `}
+  new size_download `{ return CURLINFO_SIZE_DOWNLOAD; `}
+  new speed_download `{ return CURLINFO_SPEED_DOWNLOAD; `}
+  new speed_upload `{ return CURLINFO_SPEED_UPLOAD; `}
+  new content_length_download `{ return CURLINFO_CONTENT_LENGTH_DOWNLOAD; `}
+  new content_length_upload `{ return CURLINFO_CONTENT_LENGTH_UPLOAD; `}
+  # String CURLInfoSetType - Char*
 	new content_type `{ return CURLINFO_CONTENT_TYPE; `}
+  new effective_url `{ return CURLINFO_EFFECTIVE_URL; `}
+  new redirect_url `{ return CURLINFO_REDIRECT_URL; `}
+  new primary_ip `{ return CURLINFO_PRIMARY_IP; `}
+  new local_ip `{ return CURLINFO_LOCAL_IP; `}
+  new ftp_entry_path `{ return CURLINFO_FTP_ENTRY_PATH; `}
+  new rtsp_session_id `{ return CURLINFO_RTSP_SESSION_ID; `}
+  new private_data `{ return CURLINFO_PRIVATE; `}
+end
+class CURLInfoSetType
+  fun long:Array[CURLInfo] do return once [new CURLInfo.response_code, new CURLInfo.header_size, new CURLInfo.http_connectcode, new CURLInfo.filetime, new CURLInfo.redirect_count,
+   new CURLInfo.request_size, new CURLInfo.ssl_verifyresult, new CURLInfo.httpauth_avail, new CURLInfo.proxyauth_avail, new CURLInfo.os_errno, new CURLInfo.num_connects,
+   new CURLInfo.primary_port, new CURLInfo.local_port, new CURLInfo.lastsocket, new CURLInfo.condition_unmet, new CURLInfo.rtsp_client_cseq, new CURLInfo.rtsp_server_cseq,
+   new CURLInfo.rtsp_cseq_recv]
+  fun double:Array[CURLInfo] do return once [new CURLInfo.total_time, new CURLInfo.namelookup_time, new CURLInfo.connect_time, new CURLInfo.appconnect_time, new CURLInfo.pretransfer_time,
+   new CURLInfo.starttransfer_time, new CURLInfo.redirect_time, new CURLInfo.size_upload, new CURLInfo.size_download, new CURLInfo.speed_download, new CURLInfo.speed_upload,
+   new CURLInfo.content_length_download, new CURLInfo.content_length_upload]
+  fun string:Array[CURLInfo] do return once [new CURLInfo.content_type, new CURLInfo.effective_url, new CURLInfo.redirect_url, new CURLInfo.primary_ip, new CURLInfo.local_ip,
+   new CURLInfo.ftp_entry_path, new CURLInfo.private_data]
 end
 extern CURLStatusCode `{ int `}
 	new proceed `{ return 100; `}
