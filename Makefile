@@ -19,8 +19,17 @@ EXECS = $(SOURCES:.nit=.out)
 
 all: $(EXECS)
 
+max: unit tests get dl
+
 unit: curlunit$(OUT)
-	@./$<
+	$(call print_get, "http://papercom.fr")
+	@./$< http://papercom.fr
+	$(call print_get, "http://deezfzefzefEZ.rf")
+	@./$< http://deezfzefzefEZ.rf
+	$(call print_get, "http://google.com")
+	@./$< http://google.com
+	$(call print_get, "http://instagr.am")
+	@./$< http://instagr.am
 
 tests: get dl
 
@@ -50,8 +59,10 @@ dl: dl_sample$(OUT)
 
 clean-dl:
 	@rm -f *$(OUT) php.zip index.html Chimpanzee-picture.jpg sh-mv-hackhours_video.zip
+	@clear
 	@echo "Clean dl done."
 
 clean:
 	@rm -f *$(OUT)
+	@clear
 	@echo "Clean done."
