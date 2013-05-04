@@ -1,6 +1,6 @@
 NitcURL
 =======
 
-A Nit interface to the cURL library
+Binding of cURL Library for Nit Language
 
-FFI crafted by xymus | https://github.com/xymus/nit/tree/ffi
+Using FFI, crafted by xymus | https://github.com/xymus/nit/tree/ffi
