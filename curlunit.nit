@@ -180,4 +180,30 @@ infoStr = curl.easy_getinfo_chars(new CURLInfoChars.rtsp_session_id)
 assert infoResp:infoStr != null 
 print  "GetinfoStr :: rtsp_session_id :"+infoStr.response
 
+# CURLSList set
+var infoList:nullable CURLInfoResponseSList
+infoList = curl.easy_getinfo_slist(new CURLInfoSList.ssl_engines)
+assert infoResp:infoList != null 
+print "GetSList :: ssl_engines :"+infoList.response.to_array.to_s
+
+infoList = curl.easy_getinfo_slist(new CURLInfoSList.cookielist)
+assert infoResp:infoList != null 
+print "GetSList :: cookielist :"+infoList.response.to_array.to_s
+
+
+var mailList: CURLSList
+mailList = new CURLSList
+if mailList.is_init then 
+  mailList.append("toto")
+  mailList.append("toto2")
+  mailList.append("toto3")
+  mailList.append("toto4")
+  mailList.append("toto9")
+  var content = mailList.to_array
+  print "SList content : "+content.to_s
+  print "SList length : "+content.length.to_s
+  mailList.destroy
+else
+  print "CURLSList : wrong init"
+end
 

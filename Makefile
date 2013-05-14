@@ -22,14 +22,15 @@ all: $(EXECS)
 max: unit tests get dl
 
 unit: curlunit$(OUT)
+	$(call print_get, "http://instagr.am")
+	@./$< http://instagr.am
 	$(call print_get, "http://papercom.fr")
 	@./$< http://papercom.fr
 	$(call print_get, "http://deezfzefzefEZ.rf")
 	@./$< http://deezfzefzefEZ.rf
 	$(call print_get, "http://google.com")
 	@./$< http://google.com
-	$(call print_get, "http://instagr.am")
-	@./$< http://instagr.am
+
 
 tests: get dl
 
