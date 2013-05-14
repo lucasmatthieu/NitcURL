@@ -181,14 +181,14 @@ assert infoResp:infoStr != null
 print  "GetinfoStr :: rtsp_session_id :"+infoStr.response
 
 # CURLSList set
-var infoList:nullable CURLInfoResponseSList
+var infoList:nullable CURLInfoResponseArray
 infoList = curl.easy_getinfo_slist(new CURLInfoSList.ssl_engines)
 assert infoResp:infoList != null 
-print "GetSList :: ssl_engines :"+infoList.response.to_array.to_s
+print "GetSList :: ssl_engines :"+infoList.response.to_s
 
 infoList = curl.easy_getinfo_slist(new CURLInfoSList.cookielist)
 assert infoResp:infoList != null 
-print "GetSList :: cookielist :"+infoList.response.to_array.to_s
+print "GetSList :: cookielist :"+infoList.response.to_s
 
 
 var mailList: CURLSList

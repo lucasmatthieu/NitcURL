@@ -110,13 +110,13 @@ extern FFCurl `{ CURL * `}
     return c;
 	`}
   # SList
-  fun easy_getinfo_slist(opt: CURLInfoSList):nullable CURLInfoResponseSList
+  fun easy_getinfo_slist(opt: CURLInfoSList):nullable CURLInfoResponseArray
   do
     var slist = new CURLSList
     if not i_getinfo_slist(opt, slist).is_ok then return null
-    var resp =  new CURLInfoResponseSList(slist)
-    #slist.destroy
-    return resp
+    var slistToArr = slist.to_array
+    slist.destroy
+    return new CURLInfoResponseArray(slistToArr)
   end
   private fun i_getinfo_slist(opt: CURLInfoSList, answ: CURLSList):CURLCode `{
     return curl_easy_getinfo( recv, opt, answ);
@@ -230,8 +230,8 @@ extern CURLSList `{ struct curl_slist * `}
   fun destroy `{ curl_slist_free_all(recv); `}
 end
 
-class CURLInfoResponseSList
-  var response:CURLSList
+class CURLInfoResponseArray
+  var response:Array[String]
 end
 class CURLInfoResponseLong
   var response:Int=0
