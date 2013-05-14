@@ -39,7 +39,6 @@ in "C body" `{
 `}
 
 extern FFCurl `{ CURL * `}
-
 	# Lifetime
 	new easy_init `{ return curl_easy_init(); `}
 	fun is_init:Bool `{ return (recv != NULL); `}
@@ -64,6 +63,7 @@ extern FFCurl `{ CURL * `}
 	`}
 
 	# Get infos
+  # Chars
   fun easy_getinfo_chars(opt: CURLInfoChars):nullable CURLInfoResponseString
   do
      var answ = new CURLInfoResponseString
@@ -79,6 +79,7 @@ extern FFCurl `{ CURL * `}
     }
 		return c;
 	`}
+  # Long
   fun easy_getinfo_long(opt: CURLInfoLong):nullable CURLInfoResponseLong
   do
      var answ = new CURLInfoResponseLong
@@ -93,6 +94,7 @@ extern FFCurl `{ CURL * `}
     free(r);
     return c;
 	`}
+  # Double
   fun easy_getinfo_double(opt: CURLInfoDouble):nullable CURLInfoResponseDouble
   do
      var answ = new CURLInfoResponseDouble
@@ -107,6 +109,18 @@ extern FFCurl `{ CURL * `}
     free(r);
     return c;
 	`}
+  # SList
+  fun easy_getinfo_slist(opt: CURLInfoSList):nullable CURLInfoResponseSList
+  do
+    var slist = new CURLSList
+    if not i_getinfo_slist(opt, slist).is_ok then return null
+    var resp =  new CURLInfoResponseSList(slist)
+    #slist.destroy
+    return resp
+  end
+  private fun i_getinfo_slist(opt: CURLInfoSList, answ: CURLSList):CURLCode `{
+    return curl_easy_getinfo( recv, opt, answ);
+  `}
 
 	# Register delegate callback
 	fun register_callback(delegate: FFCurlCallbacks, cbtype: CURLCallbackType):CURLCode
@@ -143,7 +157,6 @@ extern FFCurl `{ CURL * `}
     }
     return e;
   `}
-
 end
 
 extern OFile `{ FILE* `}
@@ -184,6 +197,42 @@ extern CURLCode `{ CURLcode `}
 	redef fun to_s do return code.to_s end
 end
 
+extern CURLSList `{ struct curl_slist * `}
+  new `{ 
+    struct curl_slist *l = NULL;
+    l = malloc(sizeof(struct curl_slist));
+    l->data = NULL;
+    l->next = NULL;
+    return l; 
+  `}
+  fun is_init:Bool `{ return (recv != NULL); `}
+  fun append(key: String) import String::to_cstring `{
+     char *k = String_to_cstring(key);
+     recv = curl_slist_append(recv, k);
+  `}
+  private fun i_data_reachable(c: CURLSList):Bool `{ return (c != NULL && c->data != NULL); `}
+  private fun i_next_reachable(c: CURLSList):Bool `{ return (c != NULL && c->next != NULL); `}
+  private fun i_data(c: CURLSList):String `{ return new_String_from_cstring(c->data); `}
+  private fun i_next(c: CURLSList):CURLSList `{ return c->next; `}
+  fun to_array:Array[String]
+  do
+    var r = new Array[String]
+    if not is_init == true then return r
+    if not i_next_reachable(self) == true then return r
+    var current = i_next(self)
+    loop
+      if not i_data_reachable(current) == true then break
+      r.add(i_data(current))
+      current = i_next(current)
+    end
+    return r
+  end
+  fun destroy `{ curl_slist_free_all(recv); `}
+end
+
+class CURLInfoResponseSList
+  var response:CURLSList
+end
 class CURLInfoResponseLong
   var response:Int=0
 end
@@ -192,6 +241,10 @@ class CURLInfoResponseDouble
 end
 class CURLInfoResponseString
   var response:String = ""
+end
+extern CURLInfoSList `{ CURLINFO `}
+  new ssl_engines `{ return CURLINFO_SSL_ENGINES; `}
+  new cookielist `{ return CURLINFO_COOKIELIST; `}
 end
 extern CURLInfoLong `{ CURLINFO `}
   new response_code `{ return CURLINFO_RESPONSE_CODE; `}
