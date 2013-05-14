@@ -26,7 +26,7 @@ class Curl
 	end
 
 	# Cleaning
-	fun cleanup(curl: nullable FFCurl, fle: nullable OFile, err: nullable CURLCode):nullable String
+	private fun cleanup(curl: nullable FFCurl, fle: nullable OFile, err: nullable CURLCode):nullable String
 	do
 		if curl != null then curl.easy_clean
 		if fle != null then if not fle.close then return "[ERROR] Something wrong while trying to close the file."
