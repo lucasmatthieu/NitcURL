@@ -1,6 +1,6 @@
 module curlunit
 import ffcurl
-
+import mail
 
 fun errorManager(err: CURLCode) do if not err.is_ok then print err
 
@@ -190,20 +190,32 @@ infoList = curl.easy_getinfo_slist(new CURLInfoSList.cookielist)
 assert infoResp:infoList != null 
 print "GetSList :: cookielist :"+infoList.response.to_s
 
-
-var mailList: CURLSList
-mailList = new CURLSList
+# CURLSList to Array
+var mailList:CURLSList
+mailList = new CURLSList.with_str("titi")
+mailList.append("toto")
+mailList.append("toto2")
+mailList.append("toto3")
+mailList.append("toto4")
+mailList.append("toto9")
 if mailList.is_init then 
-  mailList.append("toto")
-  mailList.append("toto2")
-  mailList.append("toto3")
-  mailList.append("toto4")
-  mailList.append("toto9")
-  var content = mailList.to_array
-  print "SList content : "+content.to_s
-  print "SList length : "+content.length.to_s
+  var content = mailList.to_a
+  print "CURLSList to array - content : {content.to_s}"
+  print "CURLSList to array - length : {content.length.to_s}"
   mailList.destroy
 else
-  print "CURLSList : wrong init"
+  print "CURLSList to array : CURLSList wrong init"
 end
 
+# CURLSList from Array
+var mailRecipientsArray = new Array[String]
+mailRecipientsArray.add("tata")
+mailRecipientsArray.add("tata2")
+var mailRecipientsList: CURLSList = mailRecipientsArray.to_curlslist
+if mailRecipientsList.is_init then 
+  print "Array to CURLSList - content: {mailRecipientsList.to_a.to_s}"
+  print "Array to CURLSList - length : {mailRecipientsList.to_a.length.to_s}"
+  mailRecipientsList.destroy
+else
+  print "CURLSList to array : CURLSList wrong init"
+end

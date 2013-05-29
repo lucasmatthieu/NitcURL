@@ -2,15 +2,18 @@
 # Colors display
 dl_color = \033[34m
 get_color = \033[32m
+mail_color = \033[35m
 no_color = \033[0m
 print_get = @echo "\n\n\t${get_color}GET $(1)\n${no_color}"
 print_dl = @echo "\n\n\t${dl_color}DL $(1)\n${no_color}"
+print_mail = @echo "\n\n\t${mail_color}MAIL $(1)\n${no_color}"
+
 
 # Nit
 CC = nitc
 EXT = .nit
 OUT = .out
-SOURCES = get_sample.nit dl_sample.nit curlunit.nit
+SOURCES = get_sample.nit dl_sample.nit mail_sample.nit curlunit.nit
 EXECS = $(SOURCES:.nit=.out)
 
 # Targets
@@ -19,7 +22,7 @@ EXECS = $(SOURCES:.nit=.out)
 
 all: $(EXECS)
 
-max: unit tests get dl
+max: unit tests get dl mail
 
 unit: curlunit$(OUT)
 	$(call print_get, "http://instagr.am")
@@ -57,6 +60,10 @@ dl: dl_sample$(OUT)
 	@./$< http://images.wikia.com/uncyclopedia/images/3/33/Chimpanzee-picture.jpg
 	$(call print_dl, "http://papercom.fr/share/f/sh-mv-hackhours_video.zip")
 	@./$< http://papercom.fr/share/f/sh-mv-hackhours_video.zip
+
+mail: mail_sample$(OUT)
+	$(call print_mail, "to:lucas.matthieu@courrier.uqam.ca / lage.stefan@courrier.uqam.ca")
+	@./$<
 
 clean-dl:
 	@rm -f *$(OUT) php.zip index.html Chimpanzee-picture.jpg sh-mv-hackhours_video.zip

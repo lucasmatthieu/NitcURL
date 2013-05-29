@@ -1,4 +1,5 @@
 module ffcurl
+import pipeline
 
 in "C header" `{
 	#include <stdio.h>
@@ -8,34 +9,48 @@ in "C header" `{
 	typedef enum {
 		CURLcallbackTypeHeader,
 		CURLcallbackTypeBody,
-		CURLcallbackTypeStream
+		CURLcallbackTypeStream,
+    CURLcallbackTypeRead,
 	} CURLcallbackType;
 
 	typedef struct {
 		FFCurlCallbacks delegate;
 		CURLcallbackType type;
 	} CURLCallbackDatas;
+
+  typedef struct {
+    char *data;
+    int len;
+    int pos;
+  } CURLCallbackReadDatas;
 `}
 
 in "C body" `{
 	size_t nit_curl_callback_func(void *buffer, size_t size, size_t count, CURLCallbackDatas *datas){
-		char *line_c = (char*)buffer;
-		String line_o = new_String_from_cstring(line_c);
-		switch(datas->type){
-			case CURLcallbackTypeHeader:
-				FFCurlCallbacks_header_callback(datas->delegate, line_o);
-				break;
-			case CURLcallbackTypeBody:
-				FFCurlCallbacks_body_callback(datas->delegate, line_o);
-				break;
-			case CURLcallbackTypeStream:
-				FFCurlCallbacks_stream_callback(datas->delegate, line_o, size, count);
-				break;
-			default:
-				break;
-		}
+    if(datas->type == CURLcallbackTypeHeader){
+      char *line_c = (char*)buffer;
+		  String line_o = new_String_from_cstring(line_c);
+		  FFCurlCallbacks_header_callback(datas->delegate, line_o);
+    }
+    else if(datas->type == CURLcallbackTypeBody){
+      char *line_c = (char*)buffer;
+		  String line_o = new_String_from_cstring(line_c);
+			FFCurlCallbacks_body_callback(datas->delegate, line_o);
+    }
+    else if(datas->type == CURLcallbackTypeStream){
+      char *line_c = (char*)buffer;
+      String line_o = new_String_from_cstring(line_c);
+			FFCurlCallbacks_stream_callback(datas->delegate, line_o, size, count);
+    }
 		return count;
 	}
+  size_t nit_curl_callback_read_func(void *buffer, size_t size, size_t count, CURLCallbackReadDatas *datas){
+    int len = datas->len - datas->pos;
+    if(len > size * count) len = size * count;
+    memcpy(buffer, datas->data + datas->pos, len);
+    datas->pos += len;
+    return len;
+  }
 `}
 
 extern FFCurl `{ CURL * `}
@@ -53,10 +68,12 @@ extern FFCurl `{ CURL * `}
 		if obj isa Bool and obj == false then return i_setopt_int(opt, 0)
 		if obj isa String then return i_setopt_string(opt, obj)
 		if obj isa OFile then return i_setopt_file(opt, obj)
+    if obj isa CURLSList then return i_setopt_slist(opt, obj)
     return once new CURLCode.unknown_option
 	end
 	private fun i_setopt_file(opt: CURLOption, fl: OFile):CURLCode `{ return curl_easy_setopt( recv, opt, fl); `}
 	private fun i_setopt_int(opt: CURLOption, num: Int):CURLCode `{ return curl_easy_setopt( recv, opt, num); `}
+  private fun i_setopt_slist(opt: CURLOption, list: CURLSList):CURLCode `{ return curl_easy_setopt( recv, opt, list); `}
 	private fun i_setopt_string(opt: CURLOption, str: String):CURLCode import String::to_cstring `{
 		char *rStr = String_to_cstring(str);
 		return curl_easy_setopt( recv, opt, rStr);
@@ -112,29 +129,42 @@ extern FFCurl `{ CURL * `}
   # SList
   fun easy_getinfo_slist(opt: CURLInfoSList):nullable CURLInfoResponseArray
   do
-    var slist = new CURLSList
-    if not i_getinfo_slist(opt, slist).is_ok then return null
-    var slistToArr = slist.to_array
-    slist.destroy
-    return new CURLInfoResponseArray(slistToArr)
+    var answ = new CURLInfoResponseArray
+    if not i_getinfo_slist(opt, answ).is_ok then return null
+    answ.response = answ.prim_response.to_a
+    answ.prim_response.destroy
+    return answ
   end
-  private fun i_getinfo_slist(opt: CURLInfoSList, answ: CURLSList):CURLCode `{
-    return curl_easy_getinfo( recv, opt, answ);
+  private fun i_getinfo_slist(opt: CURLInfoSList, res: CURLInfoResponseArray):CURLCode import CURLInfoResponseArray::prim_response=`{
+    struct curl_slist* csl = NULL;
+    CURLcode ce = curl_easy_getinfo( recv, opt, &csl);
+    CURLInfoResponseArray_prim_response__assign(res, csl);
+    return ce;
   `}
 
 	# Register delegate callback
 	fun register_callback(delegate: FFCurlCallbacks, cbtype: CURLCallbackType):CURLCode
 	do
-		if cbtype == once new CURLCallbackType.header then
-			return i_callback_register(delegate, cbtype)
-		else if cbtype == once new CURLCallbackType.body then
-			return i_callback_register(delegate, cbtype)
-		else if cbtype == once new CURLCallbackType.stream then
-			return i_callback_register(delegate, cbtype)
+		if once [new CURLCallbackType.header, new CURLCallbackType.body, new CURLCallbackType.stream, new CURLCallbackType.read].has(cbtype) then
+			return i_register_callback(delegate, cbtype)
 		end
 		return once new CURLCode.unknown_option
 	end
-	private fun i_callback_register(delegate: FFCurlCallbacks, cbtype: CURLCallbackType):CURLCode is extern import FFCurlCallbacks::header_callback,  FFCurlCallbacks::body_callback, FFCurlCallbacks::stream_callback  `{
+  fun register_read_datas_callback(delegate: FFCurlCallbacks, datas: String):CURLCode
+  do
+    if datas.length > 0 then return i_register_read_datas_callback(delegate, datas, datas.length)
+    return once new CURLCode.unknown_option
+  end
+  private fun i_register_read_datas_callback(delegate: FFCurlCallbacks, datas: String, size: Int):CURLCode import String::to_cstring `{
+     CURLCallbackReadDatas *d = NULL;
+     d = malloc(sizeof(CURLCallbackReadDatas));
+     d->data = (char*)String_to_cstring(datas);
+     d->len = size;
+     d->pos = 0;
+    return curl_easy_setopt( recv, CURLOPT_READDATA, d);
+
+  `}
+	private fun i_register_callback(delegate: FFCurlCallbacks, cbtype: CURLCallbackType):CURLCode is extern import FFCurlCallbacks::header_callback,  FFCurlCallbacks::body_callback, FFCurlCallbacks::stream_callback  `{
     CURLCallbackDatas *d = malloc(sizeof(CURLCallbackDatas));
     FFCurlCallbacks_incr_ref(delegate);
     d->type = cbtype;
@@ -152,6 +182,8 @@ extern FFCurl `{ CURL * `}
         if(e != CURLE_OK) return e;
         e = curl_easy_setopt( recv, CURLOPT_WRITEDATA, d);
       break;
+      case CURLcallbackTypeRead:
+        e = curl_easy_setopt( recv, CURLOPT_READFUNCTION, &nit_curl_callback_read_func);
       default:
       break;
     }
@@ -185,7 +217,8 @@ extern CURLCallbackType `{ CURLcallbackType `}
   new header `{ return CURLcallbackTypeHeader; `}
   new body `{ return CURLcallbackTypeBody; `}
   new stream `{ return CURLcallbackTypeStream; `}
-  fun to_i:Int `{ return recv; `} 
+  new read `{ return CURLcallbackTypeRead; `}
+  fun to_i:Int `{ return recv; `}
 end
 
 extern CURLCode `{ CURLcode `}
@@ -194,44 +227,61 @@ extern CURLCode `{ CURLcode `}
 	fun is_ok:Bool `{ return recv == CURLE_OK; `}
 	fun is_valid_protocol:Bool `{  return recv == CURLE_UNSUPPORTED_PROTOCOL; `}
 	fun is_valid_init:Bool `{ return recv == CURLE_FAILED_INIT; `}
-	redef fun to_s do return code.to_s end
+  fun to_i:Int do return code end
+	redef fun to_s `{
+    char *c = (char*)curl_easy_strerror(recv);
+    return new_String_from_cstring(c);
+  `}
 end
 
+
+
 extern CURLSList `{ struct curl_slist * `}
-  new `{ 
+  private new `{ return NULL; `}
+  new with_str(s: String) import String::to_cstring `{
     struct curl_slist *l = NULL;
-    l = malloc(sizeof(struct curl_slist));
-    l->data = NULL;
-    l->next = NULL;
-    return l; 
+    l = curl_slist_append(l, String_to_cstring(s));
+    return l;
   `}
   fun is_init:Bool `{ return (recv != NULL); `}
   fun append(key: String) import String::to_cstring `{
      char *k = String_to_cstring(key);
-     recv = curl_slist_append(recv, k);
+     curl_slist_append(recv, (char*)k);
   `}
   private fun i_data_reachable(c: CURLSList):Bool `{ return (c != NULL && c->data != NULL); `}
   private fun i_next_reachable(c: CURLSList):Bool `{ return (c != NULL && c->next != NULL); `}
   private fun i_data(c: CURLSList):String `{ return new_String_from_cstring(c->data); `}
   private fun i_next(c: CURLSList):CURLSList `{ return c->next; `}
-  fun to_array:Array[String]
+  fun to_a:Array[String]
   do
     var r = new Array[String]
-    if not is_init == true then return r
-    if not i_next_reachable(self) == true then return r
-    var current = i_next(self)
+    var cursor = self
     loop
-      if not i_data_reachable(current) == true then break
-      r.add(i_data(current))
-      current = i_next(current)
+      if i_data_reachable(cursor) != true then break
+      r.add(i_data(cursor))
+      cursor = i_next(cursor)
     end
     return r
   end
   fun destroy `{ curl_slist_free_all(recv); `}
 end
+redef class Collection[E]
+  fun to_curlslist:CURLSList
+  do
+      assert collectionItemType: self isa Collection[String] else
+        print "Collection item must be strings."
+      end
+      var primList = new CURLSList.with_str(self.first)
+      for s in self.skip_head(1) do primList.append(s)
+      return primList
+  end
+end
+
+
 
 class CURLInfoResponseArray
-  var response:Array[String]
+  var response:Array[String] = new Array[String]
+  private var prim_response:CURLSList = new CURLSList
 end
 class CURLInfoResponseLong
   var response:Int=0
