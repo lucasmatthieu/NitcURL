@@ -24,6 +24,8 @@ all: $(EXECS)
 
 max: unit tests get dl mail
 
+tests: get dl mail
+
 unit: curlunit$(OUT)
 	$(call print_get, "http://instagr.am")
 	@./$< http://instagr.am
@@ -33,9 +35,6 @@ unit: curlunit$(OUT)
 	@./$< http://deezfzefzefEZ.rf
 	$(call print_get, "http://google.com")
 	@./$< http://google.com
-
-
-tests: get dl
 
 get: get_sample$(OUT)
 	$(call print_get, "http://papercom.fr")
