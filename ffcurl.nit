@@ -107,7 +107,7 @@ extern FFCurl `{ CURL * `}
 		long *r = NULL;
     r = malloc(sizeof(long));
     CURLcode c = curl_easy_getinfo( recv, opt, r);
-    if((c == CURLE_OK) && r != NULL) CURLInfoResponseLong_response__assign( res, (long)*r);
+    if((c == CURLE_OK) && r != NULL) CURLInfoResponseLong_response__assign( res, *r);
     free(r);
     return c;
 	`}
@@ -122,7 +122,7 @@ extern FFCurl `{ CURL * `}
     double *r = NULL;
     r = malloc(sizeof(double));
     CURLcode c = curl_easy_getinfo( recv, opt, r);
-    if((c == CURLE_OK) && r != NULL) CURLInfoResponseDouble_response__assign( res, (double)*r);
+    if((c == CURLE_OK) && r != NULL) CURLInfoResponseDouble_response__assign( res, *r);
     free(r);
     return c;
 	`}
