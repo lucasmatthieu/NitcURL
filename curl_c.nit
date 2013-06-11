@@ -1,4 +1,22 @@
-module ffcurl
+# This file is part of NIT ( http://www.nitlanguage.org ).
+#
+# Copyright 2013 Matthieu Lucas <lucasmatthieu@gmail.com>
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Binding of C libCurl which allow us to interact with network.
+module curl_c
+
 import pipeline
 
 in "C header" `{
@@ -14,7 +32,7 @@ in "C header" `{
 	} CURLcallbackType;
 
 	typedef struct {
-		FFCurlCallbacks delegate;
+		CCurlCallbacks delegate;
 		CURLcallbackType type;
 	} CURLCallbackDatas;
 
@@ -26,24 +44,26 @@ in "C header" `{
 `}
 
 in "C body" `{
+  // Callbacks method for Header, Body, Stream.
 	size_t nit_curl_callback_func(void *buffer, size_t size, size_t count, CURLCallbackDatas *datas){
     if(datas->type == CURLcallbackTypeHeader){
       char *line_c = (char*)buffer;
 		  String line_o = new_String_copy_from_native(line_c);
-		  FFCurlCallbacks_header_callback(datas->delegate, line_o);
+		  CCurlCallbacks_header_callback(datas->delegate, line_o);
     }
     else if(datas->type == CURLcallbackTypeBody){
       char *line_c = (char*)buffer;
 		  String line_o = new_String_copy_from_native(line_c);
-			FFCurlCallbacks_body_callback(datas->delegate, line_o);
+			CCurlCallbacks_body_callback(datas->delegate, line_o);
     }
     else if(datas->type == CURLcallbackTypeStream){
       char *line_c = (char*)buffer;
       String line_o = new_String_from_cstring(line_c);
-			FFCurlCallbacks_stream_callback(datas->delegate, line_o, size, count);
+			CCurlCallbacks_stream_callback(datas->delegate, line_o, size, count);
     }
 		return count;
 	}
+  // Callback method to read datas from buffer.
   size_t nit_curl_callback_read_func(void *buffer, size_t size, size_t count, CURLCallbackReadDatas *datas){
     int len = datas->len - datas->pos;
     if(len > size * count) len = size * count;
@@ -53,14 +73,17 @@ in "C body" `{
   }
 `}
 
-extern FFCurl `{ CURL * `}
-	# Lifetime
+# CURL Extern Type, reproduce CURL low level behaviors
+extern CCurl `{ CURL * `}
+	# Constructor, CURL low level initializer
 	new easy_init `{ return curl_easy_init(); `}
+  # Check for correct initialization
 	fun is_init:Bool `{ return (recv != NULL); `}
+  # Easy Clean / Release CURL instance
 	fun easy_clean `{ curl_easy_cleanup( recv ); `}
+  # Perform the transfer described by setted options
 	fun easy_perform:CURLCode `{ return curl_easy_perform( recv ); `}	
-
-	# Set options
+	# Set options to tell CURL how to behave. Obj parameter type can be Int, Bool, String, OFile, CURLSList.
 	fun easy_setopt(opt: CURLOption, obj: Object):CURLCode
 	do
 		if obj isa Int then return i_setopt_int(opt, obj)
@@ -71,22 +94,25 @@ extern FFCurl `{ CURL * `}
     if obj isa CURLSList then return i_setopt_slist(opt, obj)
     return once new CURLCode.unknown_option
 	end
+  # Internal method to set options to CURL using OFile parameter.
 	private fun i_setopt_file(opt: CURLOption, fl: OFile):CURLCode `{ return curl_easy_setopt( recv, opt, fl); `}
+  # Internal method to set options to CURL using Int parameter.
 	private fun i_setopt_int(opt: CURLOption, num: Int):CURLCode `{ return curl_easy_setopt( recv, opt, num); `}
+  # Internal method to set options to CURL using CURLSList parameter.
   private fun i_setopt_slist(opt: CURLOption, list: CURLSList):CURLCode `{ return curl_easy_setopt( recv, opt, list); `}
+  # Internal method to set options to CURL using String parameter.
 	private fun i_setopt_string(opt: CURLOption, str: String):CURLCode import String::to_cstring `{
 		char *rStr = String_to_cstring(str);
 		return curl_easy_setopt( recv, opt, rStr);
 	`}
-
-	# Get infos
-  # Chars
+  # Request Chars internal information from the CURL session
   fun easy_getinfo_chars(opt: CURLInfoChars):nullable CURLInfoResponseString
   do
      var answ = new CURLInfoResponseString
      if not i_getinfo_chars(opt, answ).is_ok then return null
      return answ
   end
+  # Internal method used to get String object information initially knowns as C Chars type
 	private fun i_getinfo_chars(opt: CURLInfoChars, res: CURLInfoResponseString):CURLCode import CURLInfoResponseString::response= `{
 		char *r = NULL;
     CURLcode c = curl_easy_getinfo( recv, opt, &r);
@@ -96,13 +122,14 @@ extern FFCurl `{ CURL * `}
     }
 		return c;
 	`}
-  # Long
+  # Request Long internal information from the CURL session
   fun easy_getinfo_long(opt: CURLInfoLong):nullable CURLInfoResponseLong
   do
      var answ = new CURLInfoResponseLong
      if not i_getinfo_long(opt, answ).is_ok then return null
      return answ
   end
+  # Internal method used to get Int object information initially knowns as C Long type
 	private fun i_getinfo_long(opt: CURLInfoLong, res: CURLInfoResponseLong):CURLCode import CURLInfoResponseLong::response= `{
 		long *r = NULL;
     r = malloc(sizeof(long));
@@ -111,13 +138,14 @@ extern FFCurl `{ CURL * `}
     free(r);
     return c;
 	`}
-  # Double
+  # Request Double internal information from the CURL session
   fun easy_getinfo_double(opt: CURLInfoDouble):nullable CURLInfoResponseDouble
   do
      var answ = new CURLInfoResponseDouble
      if not i_getinfo_double(opt, answ).is_ok then return null
      return answ
   end
+  # Internal method used to get Int object information initially knowns as C Double type
   private fun i_getinfo_double(opt: CURLInfoDouble, res: CURLInfoResponseDouble):CURLCode import CURLInfoResponseDouble::response= `{
     double *r = NULL;
     r = malloc(sizeof(double));
@@ -126,7 +154,7 @@ extern FFCurl `{ CURL * `}
     free(r);
     return c;
 	`}
-  # SList
+  # Request SList internal information from the CURL session
   fun easy_getinfo_slist(opt: CURLInfoSList):nullable CURLInfoResponseArray
   do
     var answ = new CURLInfoResponseArray
@@ -135,27 +163,29 @@ extern FFCurl `{ CURL * `}
     answ.prim_response.destroy
     return answ
   end
+  # Internal method used to get Array[String] object information initially knowns as C SList type
   private fun i_getinfo_slist(opt: CURLInfoSList, res: CURLInfoResponseArray):CURLCode import CURLInfoResponseArray::prim_response=`{
     struct curl_slist* csl = NULL;
     CURLcode ce = curl_easy_getinfo( recv, opt, &csl);
     CURLInfoResponseArray_prim_response__assign(res, csl);
     return ce;
   `}
-
-	# Register delegate callback
-	fun register_callback(delegate: FFCurlCallbacks, cbtype: CURLCallbackType):CURLCode
+  # Register delegate to get callbacks about the CURL transfer performed
+	fun register_callback(delegate: CCurlCallbacks, cbtype: CURLCallbackType):CURLCode
 	do
 		if once [new CURLCallbackType.header, new CURLCallbackType.body, new CURLCallbackType.stream, new CURLCallbackType.read].has(cbtype) then
 			return i_register_callback(delegate, cbtype)
 		end
 		return once new CURLCode.unknown_option
 	end
-  fun register_read_datas_callback(delegate: FFCurlCallbacks, datas: String):CURLCode
+  # Register delegate to read datas from given buffer
+  fun register_read_datas_callback(delegate: CCurlCallbacks, datas: String):CURLCode
   do
     if datas.length > 0 then return i_register_read_datas_callback(delegate, datas, datas.length)
     return once new CURLCode.unknown_option
   end
-  private fun i_register_read_datas_callback(delegate: FFCurlCallbacks, datas: String, size: Int):CURLCode import String::to_cstring, String::copy_from_native `{
+  # Internal method used to configure read callback
+  private fun i_register_read_datas_callback(delegate: CCurlCallbacks, datas: String, size: Int):CURLCode import String::to_cstring, String::copy_from_native `{
      CURLCallbackReadDatas *d = NULL;
      d = malloc(sizeof(CURLCallbackReadDatas));
      d->data = (char*)String_to_cstring(datas);
@@ -164,9 +194,10 @@ extern FFCurl `{ CURL * `}
     return curl_easy_setopt( recv, CURLOPT_READDATA, d);
 
   `}
-	private fun i_register_callback(delegate: FFCurlCallbacks, cbtype: CURLCallbackType):CURLCode is extern import FFCurlCallbacks::header_callback,  FFCurlCallbacks::body_callback, FFCurlCallbacks::stream_callback  `{
+  # Internal method used to configure callbacks in terms of given type
+	private fun i_register_callback(delegate: CCurlCallbacks, cbtype: CURLCallbackType):CURLCode is extern import CCurlCallbacks::header_callback,  CCurlCallbacks::body_callback, CCurlCallbacks::stream_callback  `{
     CURLCallbackDatas *d = malloc(sizeof(CURLCallbackDatas));
-    FFCurlCallbacks_incr_ref(delegate);
+    CCurlCallbacks_incr_ref(delegate);
     d->type = cbtype;
     d->delegate = delegate;
     CURLcode e;
@@ -191,28 +222,38 @@ extern FFCurl `{ CURL * `}
   `}
 end
 
+# FILE Extern type, reproduce basic FILE I/O
 extern OFile `{ FILE* `}
+  # Open / Create a file from given name
   new open(str: NativeString) `{ return fopen(str, "wb"); `}
+  # Check for File validity
   fun is_valid:Bool `{ return recv != NULL; `}
+  # Internal method to write to the current file
   private fun n_write(buffer: NativeString, size: Int, count: Int):Int `{ return fwrite(buffer, size, count, recv); `}
+  # Write datas to the current file
   fun write(buffer: String, size: Int, count: Int):Int
   do
-    if not is_valid == false then return n_write(buffer.to_cstring, size, count)
+    if is_valid == true then return n_write(buffer.to_cstring, size, count)
     return 0
   end
+  # Internal method to close the current file
   private fun n_close:Int `{ return fclose(recv); `}
+  # Close the current file
   fun close:Bool
-  do 
-    if not is_valid == false then return n_close == 0
+  do
+    if is_valid == true then return n_close == 0
     return false
   end
 end
 
-interface FFCurlCallbacks
+# Interface for internal information callbacks methods
+interface CCurlCallbacks
   fun header_callback(line: String) is abstract
   fun body_callback(line: String) is abstract
   fun stream_callback(buffer: String, size: Int, count: Int) is abstract
 end
+
+# Extern Type to reproduce Enum of available Callback type
 extern CURLCallbackType `{ CURLcallbackType `}
   new header `{ return CURLcallbackTypeHeader; `}
   new body `{ return CURLcallbackTypeBody; `}
@@ -221,8 +262,12 @@ extern CURLCallbackType `{ CURLcallbackType `}
   fun to_i:Int `{ return recv; `}
 end
 
+# CURL Code binding and helpers
 extern CURLCode `{ CURLcode `}
   new unknown_option `{ return CURLE_UNKNOWN_OPTION; `}
+  new unsupported_protocol `{ return CURLE_UNSUPPORTED_PROTOCOL; `}
+  new ok `{ return CURLE_OK; `}
+  new failed_init `{ return CURLE_FAILED_INIT; `}
 	fun code:Int `{ return recv; `}
 	fun is_ok:Bool `{ return recv == CURLE_OK; `}
 	fun is_valid_protocol:Bool `{  return recv == CURLE_UNSUPPORTED_PROTOCOL; `}
@@ -230,28 +275,36 @@ extern CURLCode `{ CURLcode `}
   fun to_i:Int do return code end
 	redef fun to_s `{
     char *c = (char*)curl_easy_strerror(recv);
-    return new_String_from_copy_from_native(c);
+    return new_String_copy_from_native(c);
   `}
 end
 
-
-
+# Extern Type of the Linked list type of CURL
 extern CURLSList `{ struct curl_slist * `}
+  # Empty constructor which allow us to avoid the use of Nit NULLABLE type
   private new `{ return NULL; `}
+  # Constructor allow us to get list instancied by appending an element inside.
   new with_str(s: String) import String::to_cstring `{
     struct curl_slist *l = NULL;
     l = curl_slist_append(l, String_to_cstring(s));
     return l;
   `}
+  # Check for initialization
   fun is_init:Bool `{ return (recv != NULL); `}
+  # Append an element in the linked list
   fun append(key: String) import String::to_cstring `{
      char *k = String_to_cstring(key);
      curl_slist_append(recv, (char*)k);
   `}
+  # Internal method to check for reachability of current data
   private fun i_data_reachable(c: CURLSList):Bool `{ return (c != NULL && c->data != NULL); `}
+  # Internal method to check for reachability of next element
   private fun i_next_reachable(c: CURLSList):Bool `{ return (c != NULL && c->next != NULL); `}
+  # Internal method to get current data
   private fun i_data(c: CURLSList):String `{ return new_String_from_cstring(c->data); `}
+  # Internal method to get next element
   private fun i_next(c: CURLSList):CURLSList `{ return c->next; `}
+  # Convert current low level List to an Array[String] object
   fun to_a:Array[String]
   do
     var r = new Array[String]
@@ -263,39 +316,51 @@ extern CURLSList `{ struct curl_slist * `}
     end
     return r
   end
+  # Release allocated memory
   fun destroy `{ curl_slist_free_all(recv); `}
 end
+
 redef class Collection[E]
+  # Convert Collection[String] to CURLSList
   fun to_curlslist:CURLSList
   do
-      assert collectionItemType: self isa Collection[String] else
-        print "Collection item must be strings."
-      end
-      var primList = new CURLSList.with_str(self.first)
-      for s in self.skip_head(1) do primList.append(s)
-      return primList
+    assert collectionItemType: self isa Collection[String] else
+      print "Collection item must be strings."
+    end
+    var primList = new CURLSList.with_str(self.first)
+    for s in self.skip_head(1) do primList.append(s)
+    return primList
   end
 end
 
-
-
+# Array Response type of CCurl::easy_getinfo method
 class CURLInfoResponseArray
   var response:Array[String] = new Array[String]
   private var prim_response:CURLSList = new CURLSList
 end
+
+# Long Response type of CCurl::easy_getinfo method
 class CURLInfoResponseLong
   var response:Int=0
 end
+
+# Double Response type of CCurl::easy_getinfo method
 class CURLInfoResponseDouble
   var response:Int=0
 end
+
+# String Response type of CCurl:easy_getinfo method
 class CURLInfoResponseString
   var response:String = ""
 end
+
+# Reproduce Enum of available CURL SList information, used for CCurl::easy_getinfo
 extern CURLInfoSList `{ CURLINFO `}
   new ssl_engines `{ return CURLINFO_SSL_ENGINES; `}
   new cookielist `{ return CURLINFO_COOKIELIST; `}
 end
+
+# Reproduce Enum of available CURL Long information, used for CCurl::easy_getinfo
 extern CURLInfoLong `{ CURLINFO `}
   new response_code `{ return CURLINFO_RESPONSE_CODE; `}
   new header_size `{ return CURLINFO_HEADER_SIZE; `}
@@ -316,6 +381,8 @@ extern CURLInfoLong `{ CURLINFO `}
   new rtsp_server_cseq `{ return CURLINFO_RTSP_SERVER_CSEQ; `}
   new rtsp_cseq_recv `{ return CURLINFO_RTSP_CSEQ_RECV; `}
 end
+
+# Reproduce Enum of available CURL Double information, used for CCurl::easy_getinfo
 extern CURLInfoDouble `{ CURLINFO `}
   new total_time `{ return CURLINFO_TOTAL_TIME; `}
   new namelookup_time `{ return CURLINFO_NAMELOOKUP_TIME; `}
@@ -331,6 +398,8 @@ extern CURLInfoDouble `{ CURLINFO `}
   new content_length_download `{ return CURLINFO_CONTENT_LENGTH_DOWNLOAD; `}
   new content_length_upload `{ return CURLINFO_CONTENT_LENGTH_UPLOAD; `}
 end
+
+# Reproduce Enum of available CURL Chars information, used for CCurl::easy_getinfo
 extern CURLInfoChars `{ CURLINFO `}
 	new content_type `{ return CURLINFO_CONTENT_TYPE; `}
   new effective_url `{ return CURLINFO_EFFECTIVE_URL; `}
@@ -342,6 +411,7 @@ extern CURLInfoChars `{ CURLINFO `}
   new private_data `{ return CURLINFO_PRIVATE; `}
 end
 
+# Reproduce Enum of HTTP Status Code
 extern CURLStatusCode `{ int `}
 	new proceed `{ return 100; `}
 	new switching_protocols `{ return 101; `}
@@ -380,8 +450,10 @@ extern CURLStatusCode `{ int `}
 	new service_unavailable `{ return 503; `}
 	new gateway_timeout `{ return 504; `}
 	new http_version_not_supported `{ return 505; `}
-	fun to_i:Int `{ return recv; `} 
+  fun to_i:Int `{ return recv; `}
 end
+
+# Reproduce Enum of CURL Options usable, used for CCurl::easy_setopt
 extern CURLOption `{ CURLoption `}
 	new write_function `{ return CURLOPT_WRITEFUNCTION; `}
 	new write_data `{ return CURLOPT_WRITEDATA; `}

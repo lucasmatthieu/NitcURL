@@ -1,44 +1,63 @@
+# This file is part of NIT ( http://www.nitlanguage.org ).
+#
+# Copyright 2013 Matthieu Lucas <lucasmatthieu@gmail.com>
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Network functionnalities based on Curl_c module.
 module curl
-import ffcurl
+
+import curl_c
 
 class Curl
-	super FFCurlCallbacks
+	super CCurlCallbacks
+	var verbose: Bool writable
+	var status_code: nullable Int
+	var body_str: String
+	var headers: nullable HashMap[String, String]
+  var speed_download: nullable Int
+  var size_download: nullable Int
+  var total_time: nullable Int
+	private var i_file: nullable OFile
+  private var error_init_msg: String
 
-	var verbose:Bool writable
-	var status_code:nullable Int
-	var body_str:String
-	var headers:nullable HashMap[String, String]
-  var speed_download:nullable Int
-  var size_download:nullable Int
-  var total_time:nullable Int
-	private var i_file:nullable OFile
-
-	init 
+	init
 	do
-		status_code=null
-		body_str=""
-		verbose=false
-		headers=null
-    speed_download=null
-    size_download=null
-    total_time=null
-		i_file=null
+    verbose = false
+		status_code = null
+		body_str = ""
+		headers = null
+    speed_download = null
+    size_download = null
+    total_time = null
+		i_file = null
+    error_init_msg = "Unable to init curl"
 	end
 
-	# Cleaning
-	private fun cleanup(curl: nullable FFCurl, fle: nullable OFile, err: nullable CURLCode):nullable String
+	# Clean curl instance and opened file if exists
+	private fun cleanup(curl: nullable CCurl, fle: nullable OFile, err: nullable CURLCode):nullable String
 	do
 		if curl != null then curl.easy_clean
-		if fle != null then if not fle.close then return "[ERROR] Something wrong while trying to close the file."
+		if fle != null then if not fle.close then return "Something wrong while trying to close the file."
 		if err != null then return err.to_s
 		return null
 	end
 
-	# Behaviors
-	fun get(url: String):nullable String
+  # Get request to received data from a specified resource
+	fun get_content(url: String):nullable String
 	do
-		var dlObj = new FFCurl.easy_init
-		if not dlObj.is_init then return "[ERROR] Unable to init curl"
+		var dlObj = new CCurl.easy_init
+		if not dlObj.is_init then return self.error_init_msg
 
 		var err:CURLCode
 
@@ -68,10 +87,11 @@ class Curl
 		return null
 	end
 
-	fun download(url: String, output_name: nullable String):nullable String
+  # Download file from specified resource to a given output file name
+	fun download_to_file(url: String, output_name: nullable String):nullable String
 	do
-		var dlObj = new FFCurl.easy_init
-		if not dlObj.is_init then return "[ERROR] Unable to init curl"
+		var dlObj = new CCurl.easy_init
+		if not dlObj.is_init then return self.error_init_msg
 
 		var err:CURLCode
 		
@@ -85,19 +105,19 @@ class Curl
 		if not err.is_ok then return cleanup(dlObj, null, err)
 
 		var optName:nullable String
-		if not output_name == null then 
+		if not output_name == null then
 			optName = output_name
 		else if not url.substring(url.length-1, url.length) == "/" then
-			optName = url.basename("") 
+			optName = url.basename("")
 		else
 			cleanup(dlObj, null, null)
-			return "[ERROR] Unable to treat url to get basename"
+			return "Unable to treat url to get basename"
 		end
 
 		self.i_file = new OFile.open(optName.to_cstring)
-		if not self.i_file.is_valid then 
+		if not self.i_file.is_valid then
 			cleanup(dlObj, self.i_file, null)
-			return "[ERROR] Unable to create file"
+			return "Unable to create file"
 		end
 
 		err = dlObj.register_callback(self, new CURLCallbackType.header)
@@ -126,7 +146,7 @@ class Curl
 		return null
 	end
 
-	# Callbacks
+	# Receive headers from request due to headers callback registering
 	redef fun header_callback(line: String)
 	do
 		if self.headers == null then self.headers = new HashMap[String, String]
@@ -136,12 +156,12 @@ class Curl
 			self.headers[key] = splitted.to_s
 		end
 	end
-
+  # Receive body from request due to body callback registering
 	redef fun body_callback(line: String)
 	do
 		self.body_str = "{self.body_str}{line}"
 	end
-
+  # Receive bytes stream from request due to stream callback registering
 	redef fun stream_callback(buffer: String, size: Int, count: Int)
 	do
 		self.i_file.write(buffer, size, count)

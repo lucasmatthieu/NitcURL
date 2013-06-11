@@ -1,10 +1,10 @@
 module curlunit
-import ffcurl
+import curl_c
 import mail
 
 fun errorManager(err: CURLCode) do if not err.is_ok then print err
 
-var curl = new FFCurl.easy_init
+var curl = new CCurl.easy_init
 if not curl.is_init then print "wrong init"
 
 var error:CURLCode
