@@ -20,13 +20,11 @@ else
 	if not resp == null then print resp
 
 	# Responses
-	if not curl.status_code == null then 
-	#	print "Status code : "+curl.status_code.to_s
-	end
-	if not curl.headers == null then 
-		for x in curl.headers.keys do print x+" = "+curl.headers[x]
-	end
-	if not curl.body_str == "" then
-	#	print "Body : "+curl.body_str
-	end
+	if curl.status_code != null then print "Status code : {curl.status_code.to_s}"
+	if curl.headers != null then
+    for h_key, h_val in curl.headers.as(not null) do
+        print "{h_key} = {h_val}"
+    end
+  end
+  #if curl.body_str.length > 0 then print "Body : {curl.body_str}"
 end

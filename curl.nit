@@ -139,7 +139,7 @@ class Curl
 
 	redef fun body_callback(line: String)
 	do
-		self.body_str += line
+		self.body_str = "{self.body_str}{line}"
 	end
 
 	redef fun stream_callback(buffer: String, size: Int, count: Int)
