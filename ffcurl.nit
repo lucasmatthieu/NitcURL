@@ -39,7 +39,7 @@ in "C body" `{
     }
     else if(datas->type == CURLcallbackTypeStream){
       char *line_c = (char*)buffer;
-      String line_o = new_String_copy_from_native(line_c);
+      String line_o = new_String_from_cstring(line_c);
 			FFCurlCallbacks_stream_callback(datas->delegate, line_o, size, count);
     }
 		return count;
