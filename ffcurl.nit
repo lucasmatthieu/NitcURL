@@ -29,17 +29,17 @@ in "C body" `{
 	size_t nit_curl_callback_func(void *buffer, size_t size, size_t count, CURLCallbackDatas *datas){
     if(datas->type == CURLcallbackTypeHeader){
       char *line_c = (char*)buffer;
-		  String line_o = new_String_from_cstring(line_c);
+		  String line_o = new_String_copy_from_native(line_c);
 		  FFCurlCallbacks_header_callback(datas->delegate, line_o);
     }
     else if(datas->type == CURLcallbackTypeBody){
       char *line_c = (char*)buffer;
-		  String line_o = new_String_from_cstring(line_c);
+		  String line_o = new_String_copy_from_native(line_c);
 			FFCurlCallbacks_body_callback(datas->delegate, line_o);
     }
     else if(datas->type == CURLcallbackTypeStream){
       char *line_c = (char*)buffer;
-      String line_o = new_String_from_cstring(line_c);
+      String line_o = new_String_copy_from_native(line_c);
 			FFCurlCallbacks_stream_callback(datas->delegate, line_o, size, count);
     }
 		return count;
@@ -91,7 +91,7 @@ extern FFCurl `{ CURL * `}
 		char *r = NULL;
     CURLcode c = curl_easy_getinfo( recv, opt, &r);
     if((c == CURLE_OK) && r != NULL){
-      String ro = new_String_from_cstring(r);
+      String ro = new_String_copy_from_native(r);
 	  	CURLInfoResponseString_response__assign( res, ro);
     }
 		return c;
@@ -155,7 +155,7 @@ extern FFCurl `{ CURL * `}
     if datas.length > 0 then return i_register_read_datas_callback(delegate, datas, datas.length)
     return once new CURLCode.unknown_option
   end
-  private fun i_register_read_datas_callback(delegate: FFCurlCallbacks, datas: String, size: Int):CURLCode import String::to_cstring `{
+  private fun i_register_read_datas_callback(delegate: FFCurlCallbacks, datas: String, size: Int):CURLCode import String::to_cstring, String::copy_from_native `{
      CURLCallbackReadDatas *d = NULL;
      d = malloc(sizeof(CURLCallbackReadDatas));
      d->data = (char*)String_to_cstring(datas);
@@ -230,7 +230,7 @@ extern CURLCode `{ CURLcode `}
   fun to_i:Int do return code end
 	redef fun to_s `{
     char *c = (char*)curl_easy_strerror(recv);
-    return new_String_from_cstring(c);
+    return new_String_from_copy_from_native(c);
   `}
 end
 
