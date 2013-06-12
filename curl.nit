@@ -58,39 +58,39 @@ class Curl
   # Get request to received data from a specified resource
 	fun get_content(url: String):nullable String
 	do
-		var dlObj = new CCurl.easy_init
-		if not dlObj.is_init then return self.error_init_msg
+		var curl_obj = new CCurl.easy_init
+		if not curl_obj.is_init then return self.error_init_msg
 
 		var err:CURLCode
 
     if self.httpheaders != null then
       var httpheaders_joined = self.httpheaders.join_pair_to_array(": ")
-      err = dlObj.easy_setopt(new CURLOption.httpheader, httpheaders_joined.to_curlslist)
-      if not err.is_ok then return cleanup(dlObj, null, err)
+      err = curl_obj.easy_setopt(new CURLOption.httpheader, httpheaders_joined.to_curlslist)
+      if not err.is_ok then return cleanup(curl_obj, null, err)
     end
 
-		err = dlObj.easy_setopt(new CURLOption.url, url)
-		if not err.is_ok then return cleanup(dlObj, null, err)
+		err = curl_obj.easy_setopt(new CURLOption.url, url)
+		if not err.is_ok then return cleanup(curl_obj, null, err)
 		
-		err = dlObj.easy_setopt(new CURLOption.follow_location, 1)
-		if not err.is_ok then return cleanup(dlObj, null, err)
+		err = curl_obj.easy_setopt(new CURLOption.follow_location, 1)
+		if not err.is_ok then return cleanup(curl_obj, null, err)
 
-		err = dlObj.easy_setopt(new CURLOption.verbose, self.verbose)
-		if not err.is_ok then return cleanup(dlObj, null, err)
+		err = curl_obj.easy_setopt(new CURLOption.verbose, self.verbose)
+		if not err.is_ok then return cleanup(curl_obj, null, err)
 		
-		err = dlObj.register_callback(self, new CURLCallbackType.header)
-		if not err.is_ok then return cleanup(dlObj, null, err)
+		err = curl_obj.register_callback(self, new CURLCallbackType.header)
+		if not err.is_ok then return cleanup(curl_obj, null, err)
 
-		err = dlObj.register_callback(self, new CURLCallbackType.body)
-		if not err.is_ok then return cleanup(dlObj, null, err)
+		err = curl_obj.register_callback(self, new CURLCallbackType.body)
+		if not err.is_ok then return cleanup(curl_obj, null, err)
 
-		err = dlObj.easy_perform
-		if not err.is_ok then return cleanup(dlObj, null, err)
+		err = curl_obj.easy_perform
+		if not err.is_ok then return cleanup(curl_obj, null, err)
 
-    var st_code = dlObj.easy_getinfo_long(new CURLInfoLong.response_code)
+    var st_code = curl_obj.easy_getinfo_long(new CURLInfoLong.response_code)
 		if not st_code == null then self.status_code = st_code.response
 
-		cleanup(dlObj, null, null)
+		cleanup(curl_obj, null, null)
 
 		return null
 	end
@@ -98,43 +98,43 @@ class Curl
   # Execute HTTP Post request
   fun http_post(url: String, datas: HashMap[String, String]):nullable String
   do
-    var ps_obj = new CCurl.easy_init
-		if not ps_obj.is_init then return self.error_init_msg
+    var curl_obj = new CCurl.easy_init
+		if not curl_obj.is_init then return self.error_init_msg
 
     var err: CURLCode
 
     if self.httpheaders != null then
       var httpheaders_joined = self.httpheaders.join_pair_to_array(": ")
-      err = ps_obj.easy_setopt(new CURLOption.httpheader, httpheaders_joined.to_curlslist)
-      if not err.is_ok then return cleanup(ps_obj, null, err)
+      err = curl_obj.easy_setopt(new CURLOption.httpheader, httpheaders_joined.to_curlslist)
+      if not err.is_ok then return cleanup(curl_obj, null, err)
     end
 
-    err = ps_obj.easy_setopt(new CURLOption.url, url)
-		if not err.is_ok then return cleanup(ps_obj, null, err)
+    err = curl_obj.easy_setopt(new CURLOption.url, url)
+		if not err.is_ok then return cleanup(curl_obj, null, err)
 
-		err = ps_obj.easy_setopt(new CURLOption.follow_location, 1)
-		if not err.is_ok then return cleanup(ps_obj, null, err)
+		err = curl_obj.easy_setopt(new CURLOption.follow_location, 1)
+		if not err.is_ok then return cleanup(curl_obj, null, err)
 
-		err = ps_obj.easy_setopt(new CURLOption.verbose, self.verbose)
-		if not err.is_ok then return cleanup(ps_obj, null, err)
+		err = curl_obj.easy_setopt(new CURLOption.verbose, self.verbose)
+		if not err.is_ok then return cleanup(curl_obj, null, err)
 
-    var postdatas = datas.to_url_encoded(ps_obj)
-    err = ps_obj.easy_setopt(new CURLOption.postfields, postdatas)
-    if not err.is_ok then return cleanup(ps_obj, null, err)
+    var postdatas = datas.to_url_encoded(curl_obj)
+    err = curl_obj.easy_setopt(new CURLOption.postfields, postdatas)
+    if not err.is_ok then return cleanup(curl_obj, null, err)
 
-		err = ps_obj.register_callback(self, new CURLCallbackType.header)
-		if not err.is_ok then return cleanup(ps_obj, null, err)
+		err = curl_obj.register_callback(self, new CURLCallbackType.header)
+		if not err.is_ok then return cleanup(curl_obj, null, err)
 
-		err = ps_obj.register_callback(self, new CURLCallbackType.body)
-		if not err.is_ok then return cleanup(ps_obj, null, err)
+		err = curl_obj.register_callback(self, new CURLCallbackType.body)
+		if not err.is_ok then return cleanup(curl_obj, null, err)
 
-    err = ps_obj.easy_perform
-		if not err.is_ok then return cleanup(ps_obj, null, err)		
+    err = curl_obj.easy_perform
+		if not err.is_ok then return cleanup(curl_obj, null, err)		
 
-    var st_code = ps_obj.easy_getinfo_long(new CURLInfoLong.response_code)
+    var st_code = curl_obj.easy_getinfo_long(new CURLInfoLong.response_code)
     if not st_code == null then self.status_code = st_code.response
 
-		cleanup(ps_obj, null, null)
+		cleanup(curl_obj, null, null)
 
     return null
   end
@@ -142,25 +142,25 @@ class Curl
   # Download file from specified resource to a given output file name
 	fun download_to_file(url: String, output_name: nullable String):nullable String
 	do
-		var dlObj = new CCurl.easy_init
-		if not dlObj.is_init then return self.error_init_msg
+		var curl_obj = new CCurl.easy_init
+		if not curl_obj.is_init then return self.error_init_msg
 
 		var err:CURLCode
 
     if self.httpheaders != null then
       var httpheaders_joined = self.httpheaders.join_pair_to_array(": ")
-      err = dlObj.easy_setopt(new CURLOption.httpheader, httpheaders_joined.to_curlslist)
-      if not err.is_ok then return cleanup(dlObj, null, err)
+      err = curl_obj.easy_setopt(new CURLOption.httpheader, httpheaders_joined.to_curlslist)
+      if not err.is_ok then return cleanup(curl_obj, null, err)
     end
 		
-		err = dlObj.easy_setopt(new CURLOption.url, url)
-		if not err.is_ok then return cleanup(dlObj, null, err)
+		err = curl_obj.easy_setopt(new CURLOption.url, url)
+		if not err.is_ok then return cleanup(curl_obj, null, err)
 
-		err = dlObj.easy_setopt(new CURLOption.follow_location, 1)
-		if not err.is_ok then return cleanup(dlObj, null, err)
+		err = curl_obj.easy_setopt(new CURLOption.follow_location, 1)
+		if not err.is_ok then return cleanup(curl_obj, null, err)
 
-		err = dlObj.easy_setopt(new CURLOption.verbose, self.verbose)
-		if not err.is_ok then return cleanup(dlObj, null, err)
+		err = curl_obj.easy_setopt(new CURLOption.verbose, self.verbose)
+		if not err.is_ok then return cleanup(curl_obj, null, err)
 
 		var optName:nullable String
 		if not output_name == null then
@@ -168,38 +168,38 @@ class Curl
 		else if not url.substring(url.length-1, url.length) == "/" then
 			optName = url.basename("")
 		else
-			cleanup(dlObj, null, null)
+			cleanup(curl_obj, null, null)
 			return "Unable to treat url to get basename"
 		end
 
 		self.i_file = new OFile.open(optName.to_cstring)
 		if not self.i_file.is_valid then
-			cleanup(dlObj, self.i_file, null)
+			cleanup(curl_obj, self.i_file, null)
 			return "Unable to create file"
 		end
 
-		err = dlObj.register_callback(self, new CURLCallbackType.header)
-		if not err.is_ok then return cleanup(dlObj, self.i_file, err)
+		err = curl_obj.register_callback(self, new CURLCallbackType.header)
+		if not err.is_ok then return cleanup(curl_obj, self.i_file, err)
 
-		err = dlObj.register_callback(self, new CURLCallbackType.stream)
-		if not err.is_ok then return cleanup(dlObj, self.i_file, err)
+		err = curl_obj.register_callback(self, new CURLCallbackType.stream)
+		if not err.is_ok then return cleanup(curl_obj, self.i_file, err)
 
-		err = dlObj.easy_perform
-		if not err.is_ok then return cleanup(dlObj, self.i_file, err)		
+		err = curl_obj.easy_perform
+		if not err.is_ok then return cleanup(curl_obj, self.i_file, err)		
 
-    var st_code = dlObj.easy_getinfo_long(new CURLInfoLong.response_code)
+    var st_code = curl_obj.easy_getinfo_long(new CURLInfoLong.response_code)
     if not st_code == null then self.status_code = st_code.response
 
-    var speed = dlObj.easy_getinfo_double(new CURLInfoDouble.speed_download)
+    var speed = curl_obj.easy_getinfo_double(new CURLInfoDouble.speed_download)
     if not speed == null then self.speed_download = speed.response
 
-    var size = dlObj.easy_getinfo_double(new CURLInfoDouble.size_download)
+    var size = curl_obj.easy_getinfo_double(new CURLInfoDouble.size_download)
     if not size == null then self.size_download = size.response
 
-    var time = dlObj.easy_getinfo_double(new CURLInfoDouble.total_time)
+    var time = curl_obj.easy_getinfo_double(new CURLInfoDouble.total_time)
     if not time == null then self.total_time = time.response
 
-		cleanup(dlObj, self.i_file, null)
+		cleanup(curl_obj, self.i_file, null)
 
 		return null
 	end
