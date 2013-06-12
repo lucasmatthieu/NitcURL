@@ -20,14 +20,25 @@ module post_sample
 import curl
 
 var curl = new Curl
-curl.verbose = true
+curl.verbose = false
 
+# Url
 var url = "172.16.217.134/post.php"
+# Datas
 var datas = new HashMap[String, String]
 datas["Bugs Bunny"] = "Daffy Duck"
 datas["Batman"] = "Robin likes special characters @#ùà!è§'(\"é&://,;<>∞~*"
 
+# Request
 var resp = curl.http_post(url, datas)
+# Answer
 if resp != null then print resp
+# Content Type
+if curl.headers != null then print "Content-Type : {curl.headers["Content-Type"]}"
+# Status code
+if curl.status_code != null then print "Status code : {curl.status_code.to_s}"
+# Body
+if curl.body_str != null then print "Body : {curl.body_str.as(not null)}"
+
 
 

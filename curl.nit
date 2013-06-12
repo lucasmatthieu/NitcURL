@@ -23,7 +23,7 @@ class Curl
 	super CCurlCallbacks
 	var verbose: Bool writable
 	var status_code: nullable Int
-	var body_str: String
+	var body_str: nullable String
 	var headers: nullable HashMap[String, String]
   var speed_download: nullable Int
   var size_download: nullable Int
@@ -35,7 +35,7 @@ class Curl
 	do
     verbose = false
 		status_code = null
-		body_str = ""
+		body_str = null
 		headers = null
     speed_download = null
     size_download = null
@@ -109,6 +109,9 @@ class Curl
     if not err.is_ok then return cleanup(ps_obj, null, err)
 
 		err = ps_obj.register_callback(self, new CURLCallbackType.header)
+		if not err.is_ok then return cleanup(ps_obj, null, err)
+
+		err = ps_obj.register_callback(self, new CURLCallbackType.body)
 		if not err.is_ok then return cleanup(ps_obj, null, err)
 
     err = ps_obj.easy_perform
@@ -194,7 +197,11 @@ class Curl
   # Receive body from request due to body callback registering
 	redef fun body_callback(line: String)
 	do
-		self.body_str = "{self.body_str}{line}"
+    if self.body_str != null then
+      self.body_str = "{self.body_str.as(not null)}{line}"
+    else
+  		self.body_str = line
+    end
 	end
   # Receive bytes stream from request due to stream callback registering
 	redef fun stream_callback(buffer: String, size: Int, count: Int)
