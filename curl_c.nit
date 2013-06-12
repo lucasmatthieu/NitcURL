@@ -331,7 +331,7 @@ end
 
 redef class Collection[E]
   # Convert Collection[String] to CURLSList
-  fun to_curlslist:CURLSList
+  fun to_curlslist: CURLSList
   do
     assert collectionItemType: self isa Collection[String] else
       print "Collection item must be strings."
@@ -344,7 +344,7 @@ end
 
 redef class HashMap[E,E]
   # Convert HashMap to a single string used to post http fields
-  fun to_url_encoded(curl: CCurl):String
+  fun to_url_encoded(curl: CCurl): String
   do
     assert hashMapItemType: self isa HashMap[String, String] else
       print "HashMap items must be strings : strings."
@@ -367,9 +367,9 @@ redef class HashMap[E,E]
     return str
   end
   # Concatenate couple of 'key value' separated by 'sep' in Array
-  fun join_pair_to_array(sep: String):Array[E]
+  fun join_pairs(sep: String): Array[String]
   do
-    var col = new Array[E]
+    var col = new Array[String]
     for k, v in self do col.add("{k}{sep}{v}")
     return col
   end

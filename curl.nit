@@ -64,7 +64,7 @@ class Curl
 		var err:CURLCode
 
     if self.httpheaders != null then
-      var httpheaders_joined = self.httpheaders.join_pair_to_array(": ")
+      var httpheaders_joined = self.httpheaders.join_pairs(": ")
       err = curl_obj.easy_setopt(new CURLOption.httpheader, httpheaders_joined.to_curlslist)
       if not err.is_ok then return cleanup(curl_obj, null, err)
     end
@@ -104,7 +104,7 @@ class Curl
     var err: CURLCode
 
     if self.httpheaders != null then
-      var httpheaders_joined = self.httpheaders.join_pair_to_array(": ")
+      var httpheaders_joined = self.httpheaders.join_pairs(": ")
       err = curl_obj.easy_setopt(new CURLOption.httpheader, httpheaders_joined.to_curlslist)
       if not err.is_ok then return cleanup(curl_obj, null, err)
     end
@@ -148,7 +148,7 @@ class Curl
 		var err:CURLCode
 
     if self.httpheaders != null then
-      var httpheaders_joined = self.httpheaders.join_pair_to_array(": ")
+      var httpheaders_joined = self.httpheaders.join_pairs(": ")
       err = curl_obj.easy_setopt(new CURLOption.httpheader, httpheaders_joined.to_curlslist)
       if not err.is_ok then return cleanup(curl_obj, null, err)
     end
@@ -162,17 +162,17 @@ class Curl
 		err = curl_obj.easy_setopt(new CURLOption.verbose, self.verbose)
 		if not err.is_ok then return cleanup(curl_obj, null, err)
 
-		var optName:nullable String
+		var opt_name:nullable String
 		if not output_name == null then
-			optName = output_name
+			opt_name = output_name
 		else if not url.substring(url.length-1, url.length) == "/" then
-			optName = url.basename("")
+			opt_name = url.basename("")
 		else
 			cleanup(curl_obj, null, null)
 			return "Unable to treat url to get basename"
 		end
 
-		self.i_file = new OFile.open(optName.to_cstring)
+		self.i_file = new OFile.open(opt_name.to_cstring)
 		if not self.i_file.is_valid then
 			cleanup(curl_obj, self.i_file, null)
 			return "Unable to create file"
@@ -214,6 +214,7 @@ class Curl
 			self.headers[key] = splitted.to_s
 		end
 	end
+
   # Receive body from request due to body callback registering
 	redef fun body_callback(line: String)
 	do
@@ -223,6 +224,7 @@ class Curl
   		self.body_str = line
     end
 	end
+  
   # Receive bytes stream from request due to stream callback registering
 	redef fun stream_callback(buffer: String, size: Int, count: Int)
 	do
