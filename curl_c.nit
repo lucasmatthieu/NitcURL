@@ -220,6 +220,15 @@ extern CCurl `{ CURL * `}
     }
     return e;
   `}
+  # Convert given string to URL encoded string
+  fun escape(url: String):String `{
+      char *orig_url, *encoded_url = NULL;
+      orig_url = String_to_cstring(url);
+      encoded_url = curl_easy_escape( recv, orig_url, strlen(orig_url));
+      String b_url = new_String_copy_from_native(encoded_url);
+      curl_free(encoded_url);
+      return b_url;
+  `}
 end
 
 # FILE Extern type, reproduce basic FILE I/O
@@ -330,6 +339,32 @@ redef class Collection[E]
     var primList = new CURLSList.with_str(self.first)
     for s in self.skip_head(1) do primList.append(s)
     return primList
+  end
+end
+
+redef class HashMap[E,E]
+  # Convert HashMap to a single string used to post http fields
+  fun to_url_encoded(curl: CCurl):String
+  do
+    assert hashMapItemType: self isa HashMap[String, String] else
+      print "HashMap items must be strings : strings."
+    end
+    assert curlNotInitialized: curl.is_init else
+      print "to_url_encoded required a valid instance of CCurl Object."
+    end
+    var str: String = ""
+    var length = self.keys.length
+    var i = 0
+    for k, v in self do
+      if k.length > 0 then
+        k = curl.escape(k)
+        v = curl.escape(v)
+        str = "{str}{k}={v}"
+        if i < length-1 then str = "{str}&"
+      end
+      i += 1
+    end
+    return str
   end
 end
 
@@ -470,7 +505,7 @@ extern CURLOption `{ CURLoption `}
 #	new  `{ return CURLOPT_READFUNCTION; `}
 #	new  `{ return CURLOPT_TIMEOUT; `}
 #	new  `{ return CURLOPT_INFILESIZE; `}
-#	new  `{ return CURLOPT_POSTFIELDS; `}
+	new postfields `{ return CURLOPT_POSTFIELDS; `}
 #	new  `{ return CURLOPT_REFERER; `}
 #	new  `{ return CURLOPT_FTPPORT; `}
 #	new  `{ return CURLOPT_USERAGENT; `}

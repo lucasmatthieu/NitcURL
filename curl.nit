@@ -87,6 +87,41 @@ class Curl
 		return null
 	end
 
+  # Execute HTTP Post request
+  fun http_post(url: String, datas: HashMap[String, String]):nullable String
+  do
+    var ps_obj = new CCurl.easy_init
+		if not ps_obj.is_init then return self.error_init_msg
+
+    var err: CURLCode
+
+    err = ps_obj.easy_setopt(new CURLOption.url, url)
+		if not err.is_ok then return cleanup(ps_obj, null, err)
+
+		err = ps_obj.easy_setopt(new CURLOption.follow_location, 1)
+		if not err.is_ok then return cleanup(ps_obj, null, err)
+
+		err = ps_obj.easy_setopt(new CURLOption.verbose, self.verbose)
+		if not err.is_ok then return cleanup(ps_obj, null, err)
+
+    var postdatas = datas.to_url_encoded(ps_obj)
+    err = ps_obj.easy_setopt(new CURLOption.postfields, postdatas)
+    if not err.is_ok then return cleanup(ps_obj, null, err)
+
+		err = ps_obj.register_callback(self, new CURLCallbackType.header)
+		if not err.is_ok then return cleanup(ps_obj, null, err)
+
+    err = ps_obj.easy_perform
+		if not err.is_ok then return cleanup(ps_obj, null, err)		
+
+    var st_code = ps_obj.easy_getinfo_long(new CURLInfoLong.response_code)
+    if not st_code == null then self.status_code = st_code.response
+
+		cleanup(ps_obj, null, null)
+
+    return null
+  end
+
   # Download file from specified resource to a given output file name
 	fun download_to_file(url: String, output_name: nullable String):nullable String
 	do
