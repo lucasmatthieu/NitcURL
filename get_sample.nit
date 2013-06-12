@@ -25,7 +25,12 @@ else
 	var curl = new Curl
 	curl.verbose = false
 
-	# Parameters
+  # Custom Headers
+  var custom_head = new HashMap[String, String]
+  custom_head["Accept"] = "moo"
+  curl.httpheaders = custom_head
+
+	# Request
 	var resp: nullable String = null
 	resp = curl.get_content(args[0])
 
@@ -42,5 +47,5 @@ else
     end
   end
   # - Body
-  if curl.body_str.length > 0 then print "Body : {curl.body_str}"
+  if curl.body_str != null then print "Body : {curl.body_str.as(not null)}"
 end

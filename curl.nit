@@ -24,6 +24,7 @@ class Curl
 	var verbose: Bool writable
 	var status_code: nullable Int
 	var body_str: nullable String
+  var httpheaders: nullable HashMap[String, String] writable
 	var headers: nullable HashMap[String, String]
   var speed_download: nullable Int
   var size_download: nullable Int
@@ -36,6 +37,7 @@ class Curl
     verbose = false
 		status_code = null
 		body_str = null
+    httpheaders = null
 		headers = null
     speed_download = null
     size_download = null
@@ -60,6 +62,12 @@ class Curl
 		if not dlObj.is_init then return self.error_init_msg
 
 		var err:CURLCode
+
+    if self.httpheaders != null then
+      var httpheaders_joined = self.httpheaders.join_pair_to_array(": ")
+      err = dlObj.easy_setopt(new CURLOption.httpheader, httpheaders_joined.to_curlslist)
+      if not err.is_ok then return cleanup(dlObj, null, err)
+    end
 
 		err = dlObj.easy_setopt(new CURLOption.url, url)
 		if not err.is_ok then return cleanup(dlObj, null, err)
@@ -94,6 +102,12 @@ class Curl
 		if not ps_obj.is_init then return self.error_init_msg
 
     var err: CURLCode
+
+    if self.httpheaders != null then
+      var httpheaders_joined = self.httpheaders.join_pair_to_array(": ")
+      err = ps_obj.easy_setopt(new CURLOption.httpheader, httpheaders_joined.to_curlslist)
+      if not err.is_ok then return cleanup(ps_obj, null, err)
+    end
 
     err = ps_obj.easy_setopt(new CURLOption.url, url)
 		if not err.is_ok then return cleanup(ps_obj, null, err)
@@ -132,6 +146,12 @@ class Curl
 		if not dlObj.is_init then return self.error_init_msg
 
 		var err:CURLCode
+
+    if self.httpheaders != null then
+      var httpheaders_joined = self.httpheaders.join_pair_to_array(": ")
+      err = dlObj.easy_setopt(new CURLOption.httpheader, httpheaders_joined.to_curlslist)
+      if not err.is_ok then return cleanup(dlObj, null, err)
+    end
 		
 		err = dlObj.easy_setopt(new CURLOption.url, url)
 		if not err.is_ok then return cleanup(dlObj, null, err)

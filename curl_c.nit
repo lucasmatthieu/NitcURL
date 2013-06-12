@@ -366,6 +366,13 @@ redef class HashMap[E,E]
     end
     return str
   end
+  # Concatenate couple of 'key value' separated by 'sep' in Array
+  fun join_pair_to_array(sep: String):Array[E]
+  do
+    var col = new Array[E]
+    for k, v in self do col.add("{k}{sep}{v}")
+    return col
+  end
 end
 
 # Array Response type of CCurl::easy_getinfo method
@@ -513,7 +520,7 @@ extern CURLOption `{ CURLoption `}
 #	new  `{ return CURLOPT_LOW_SPEED_TIME; `}
 #	new  `{ return CURLOPT_RESUME_FROM; `}
 #	new  `{ return CURLOPT_COOKIE; `}
-#	new  `{ return CURLOPT_HTTPHEADER; `}
+	new httpheader `{ return CURLOPT_HTTPHEADER; `}
 #	new  `{ return CURLOPT_HTTPPOST; `}
 #	new  `{ return CURLOPT_SSLCERT; `}
 #	new  `{ return CURLOPT_KEYPASSWD; `}
