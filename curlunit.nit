@@ -1,5 +1,6 @@
 module curlunit
 import curl_c
+import curl
 import mail
 
 fun errorManager(err: CURLCode) do if not err.is_ok then print err
@@ -219,3 +220,13 @@ if mailRecipientsList.is_init then
 else
   print "CURLSList to array : CURLSList wrong init"
 end
+
+# Collection Refines
+#var arrayRefined = new Array[Int]
+#arrayRefined.add(1)
+#arrayRefined.to_curlslist
+
+# HashMap Refines
+var hashMapRefined = new HeaderMap
+hashMapRefined["hello"] = "toto"
+print hashMapRefined.to_url_encoded(new CCurl.easy_init)

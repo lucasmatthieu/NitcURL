@@ -342,39 +342,6 @@ redef class Collection[E]
   end
 end
 
-redef class HashMap[E,E]
-  # Convert HashMap to a single string used to post http fields
-  fun to_url_encoded(curl: CCurl): String
-  do
-    assert hashMapItemType: self isa HashMap[String, String] else
-      print "HashMap items must be strings : strings."
-    end
-    assert curlNotInitialized: curl.is_init else
-      print "to_url_encoded required a valid instance of CCurl Object."
-    end
-    var str: String = ""
-    var length = self.keys.length
-    var i = 0
-    for k, v in self do
-      if k.length > 0 then
-        k = curl.escape(k)
-        v = curl.escape(v)
-        str = "{str}{k}={v}"
-        if i < length-1 then str = "{str}&"
-      end
-      i += 1
-    end
-    return str
-  end
-  # Concatenate couple of 'key value' separated by 'sep' in Array
-  fun join_pairs(sep: String): Array[String]
-  do
-    var col = new Array[String]
-    for k, v in self do col.add("{k}{sep}{v}")
-    return col
-  end
-end
-
 # Array Response type of CCurl::easy_getinfo method
 class CURLInfoResponseArray
   var response:Array[String] = new Array[String]
